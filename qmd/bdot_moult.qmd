@@ -1,0 +1,211 @@
+---
+title: "Banded Dotterel Moult Study"
+subtitle: | 
+  Exploration of dataset
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+author: 
+ - name: Luke Eberhart-Hertel
+   orcid: 0000-0001-7311-6088
+   email: luke.eberhart@bi.mpg.de
+   url: https://www.bi.mpg.de/person/115852/2867
+   affiliations:
+     - ref: bk
+ - name: Bashar Jarayseh
+   affiliations:
+     - ref: bk
+ - name: Ailsa Howard
+   affiliations:
+     - ref: ah
+ - name: Emma Williams
+   affiliations:
+     - ref: ew
+ - name: Colin O`Donnell
+   affiliations:
+     - ref: ew
+ - name: Bart Kempenaers
+   affiliations:
+     - ref: bk
+affiliations:
+ - id: bk
+   number: 1
+   name: Department of Ornithology, Max Planck Institute for Biological Intelligence, Seewiesen, Germany
+ - id: ah
+   number: 2
+   name: South Bay Banded Dotterel Project, Kaikoura, New Zealand
+ - id: ew
+   number: 3
+   name: Department of Conservation, Christchurch, New Zealand
+format: 
+  html:
+    toc: true
+    code-fold: true
+    code-tools: true
+    self-contained: true
+    highlight-style: github
+    theme: Cosmo
+execute:
+  warning: false
+  cache: true
+editor_options: 
+  chunk_output_type: console
+---
+```{r}
+knitr::opts_chunk$set(cache = TRUE)
+```
+
+## Prerequisites
+
+### R packages
+
+-   The following packages are needed for analysis and can be easily installed from [CRAN](http://cran.r-project.org/) or GitHub by running the following code chunk:
+
+```{r, message=FALSE, results='hide', warning=FALSE, results='hide', cache=FALSE}
+# a vector of all the packages needed in the project
+packages_required_in_project <- c("tidyverse",
+                                  "readxl",
+                                  "RMark",
+                                  "RColorBrewer",
+                                  "patchwork",
+                                  "mapview",
+                                  "lubridate",
+                                  "extrafont",
+                                  "here",
+                                  "DT",
+                                  "leaflet",
+                                  "sf",
+                                  "leafpop",
+                                  "tsibble",
+                                  "corrplot",
+                                  "gghalves",
+                                  "gam",
+                                  "pscl",
+                                  "gamlss",
+                                  "gt",
+                                  "lme4",
+                                  "ggpattern")
+                                  
+# of the required packages, check if some need to be installed
+new.packages <- 
+  packages_required_in_project[!(packages_required_in_project %in% 
+                                   installed.packages()[,"Package"])]
+
+# install all packages that are not locally available
+if(length(new.packages)) install.packages(new.packages)
+
+# load all the packages into the current R session
+lapply(packages_required_in_project, require, character.only = TRUE)
+
+# set the home directory to where the project is locally based (i.e., to find 
+# the relevant datasets to import, etc.
+here::set_here()
+```
+
+### Plotting themes
+
+-   The following plotting themes, colors, and typefaces are used throughout the project:
+
+```{r, message=FALSE, results='hide', warning=FALSE}
+# Find fonts from computer that you want. Use regular expressions to do this
+# For example, load all fonts that are 'verdana' or 'Verdana'
+extrafont::font_import(pattern = "[V/v]erdana", prompt = FALSE) 
+
+# check which fonts were loaded
+extrafont::fonts()
+extrafont::fonttable()
+extrafont::loadfonts() # load these into R
+
+# define the plotting theme to be used in subsequent ggplots
+luke_theme <- 
+  theme_bw() +
+  theme(
+    text = element_text(family = "Verdana"),
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 8),
+    axis.title.x = element_text(size = 10),
+    axis.text.x  = element_text(size = 8), 
+    axis.title.y = element_text(size = 10),
+    axis.text.y = element_text(size = 8),
+    strip.text = element_text(size = 10),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.ticks = element_line(linewidth = 0.5, colour = "grey40"),
+    axis.ticks.length = unit(0.2, "cm"),
+    panel.border = element_rect(linetype = "solid", colour = "grey"),
+    legend.position = c(0.1, 0.9)
+  )
+```
+
+## Explore Bashar's Dataset (sent 12-Aug-2024)
+This dataset contains the scored moult data for all usable photos from the 
+
+```{r}
+# import data with all columns as character (so that no auto-formatting is done by R)
+dat <- 
+  read.csv(here("data/Data_21_22.csv"), colClasses = "character")
+
+# check values of Date column for mistakes...looks good
+unique(dat$Date)
+
+# check values of Score column for mistakes...looks good
+unique(dat$Score)
+
+# check values of Rings_comb column for mistakes...looks good
+unique(dat$Rings_comb)
+
+# mutate the Date column into a date variable
+dat <- 
+  dat %>% 
+    mutate(date = paste(substring(Date, first = 7, last = 10), 
+                        substring(Date, first = 4, last = 5),
+                        substring(Date, first = 1, last = 2),
+                       sep = "-") %>% as.Date()) %>% 
+  # subset to data with Molt == 1
+  filter(Molt == 1) %>% 
+  # specify the season as the first calender year
+  mutate(season = ifelse(month(date) < 7, year(date) - 1, year(date)))
+
+dat %>%
+  pull(Rings_comb) %>% unique() %>% length()
+
+# summarize the number of individuals in the dataset...65 unique combos
+dat %>%
+  pull(Rings_comb) %>% unique() %>% length()
+
+# summarise the number of seasons for each individual...7 have two seasons of data
+dat %>%
+  select(Rings_comb, season) %>% 
+  distinct() %>% 
+  group_by(Rings_comb) %>% 
+  summarise(n_seasons = n()) %>% 
+  arrange(desc(n_seasons))
+
+# summarise the number of usable photos for each individual...
+dat %>%
+  group_by(Rings_comb, season) %>% 
+  summarise(n_photos = n()) %>% 
+  arrange(desc(n_photos))
+
+# summarise the number of usable photos for each individual...
+dat %>%
+  group_by(Rings_comb, season) %>% 
+  summarise(n_photos = n()) %>% 
+  arrange(desc(n_photos))
+
+ggplot(data = dat %>% filter(season == 2021) %>% mutate(Score = as.numeric(Score))) +
+  geom_point(aes(y = 1, x = date, fill = Score), 
+             pch = 21, color = "black", size = 3) +
+  facet_wrap(. ~ Rings_comb, ncol = 1, strip.position = "right") +
+  scale_fill_gradient(high = "#cc4c02", low = "white") +
+  theme_bw() +
+  theme(axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.ticks = element_blank(),
+        strip.text.y.right = element_text(angle = 0)) +
+  scale_x_date(date_labels = "%W", expand = c(0.01, 0.01), 
+               date_breaks = "3 week", 
+               limits = c(as.Date("2021-07-05"), as.Date("2022-05-01"))) +
+  xlab("week")
+```
+
