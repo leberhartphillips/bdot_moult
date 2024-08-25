@@ -84,7 +84,8 @@ packages_required_in_project <- c("tidyverse",
                                   "lme4",
                                   "ggpattern",
                                   "gtsummary",
-                                  "effects")
+                                  "effects",
+                                  "lattice")
                                   
 # of the required packages, check if some need to be installed
 new.packages <- 
@@ -253,6 +254,7 @@ ggplot(data = dat %>% filter(season == 2022) %>% mutate(Score = as.numeric(Score
 ### sex-specific differences in breeding plumage
 
 ```{r}
+# extract the core breeding months (i.e., when presumably all birds are at their maximum breeding plumage), and determine the maximum score for each individual. Note: only looking at 2021-2022 season as it has the most even coverage across the breeding season
 ind_breeding_scores <- 
   dat %>% 
   filter(season == 2021) %>%
@@ -262,15 +264,32 @@ ind_breeding_scores <-
   group_by(Rings_comb, sex) %>% 
   summarise(max_breeding_score = max(Score))
 
+# Assess sample sizes of each sex
+ind_breeding_scores %>% 
+  group_by(sex) %>% 
+  summarise(n_distinct(Rings_comb))
+
+# density plot of sex-specific breeding plumage score distributions
 ggplot() +
   geom_density(data = ind_breeding_scores,
                aes(max_breeding_score, fill = sex), alpha = 0.5, adjust = 1) +
   luke_theme +
-  xlab("maximum breeding plumage score")
+  theme(axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        legend.position = c(0.15, 0.9)) +
+  xlab("maximum individual breeding plumage score") +
+  scale_colour_brewer(palette = "Dark2", direction = -1,
+                      name = "Sex",
+                      labels = c("Female (N = 29)", "Male (N = 21)")) +
+  scale_fill_brewer(palette = "Dark2", direction = -1,
+                    name = "Sex",
+                    labels = c("Female (N = 29)", "Male (N = 21)"))
 ```
 
 ### within-individual moult dynamics
 ```{r}
+# calcualte the individual proportional moult scores by comparing each score to a given individual's max (determined in previous chunk). Note: only looking at 2021-2022 season at this stage due to more even coverage of Ailsa's photos across the season.
 ind_prop_molt_scores <- 
   dat %>% 
   filter(season == 2021) %>% 
@@ -279,18 +298,22 @@ ind_prop_molt_scores <-
   filter(!is.na(max_breeding_score)) %>% 
   mutate(prop_molt_score = Score/max_breeding_score)
 
+# mixed effects binomial model comparing sex and date effect on the changes in moult scores
 mod1 <- 
   lme4::glmer(prop_molt_score ~ 
          date_J + sex +
-         (1 | Rings_comb), 
+         (1 | Rings_comb),
        data = ind_prop_molt_scores, 
        family = binomial)
 
+# strong date effect, but no sex effect
 tbl_regression(mod1, intercept = TRUE, 
                label = list(date_J ~ "Date", sex ~ "Sex"))
 
+# extract predicted trends
 pr <- ggeffects::predict_response(mod1, c("date_J [30:293]", "sex"))
 
+# back-transform the dates (i.e., Julian dates were optimized for Austral summer)
 dates_for_plot <- 
   data.frame(date = as.Date((filter(dat, season == 2021) %>% 
                                pull(date) %>% min()):
@@ -301,23 +324,22 @@ dates_for_plot <-
                (filter(dat, season == 2021) %>% 
                   pull(date_J) %>% max()))
 
+# join the back-transformed dates to model fits
 mod1_fits <- 
   as.data.frame(pr) %>% 
   rename(date_J = x,
          sex = group) %>% 
   left_join(., dates_for_plot, by = "date_J")
 
+# plot the model
 ggplot() +
   geom_line(data = mod1_fits, 
             aes(x = date, y = predicted, color = sex)) +
   geom_ribbon(data = mod1_fits, 
               aes(x = date, ymax = conf.high, ymin = conf.low, fill = sex),
               lwd = 1, alpha = 0.25) +
-  # geom_point(data = mod1_fits,
-  #            aes(x = date, y = predicted, fill = sex),
-  #            shape = 21, size = 2) +
   luke_theme +
-  theme(legend.position = c(0.2, 0.2),
+  theme(legend.position = c(0.3, 0.2),
         legend.justification = c(1, 0),
         strip.background = element_blank(),
         axis.title.x = element_blank(),
@@ -329,41 +351,10 @@ ggplot() +
   scale_x_date(date_labels = "%B", 
                expand = c(0.01, 0.01), 
                date_breaks = "1 month") +
-  scale_colour_brewer(palette = "Dark2",
+  scale_colour_brewer(palette = "Dark2", direction = -1,
                       name = "Sex",
-                      labels = c("Female", "Male")) +
-  scale_fill_brewer(palette = "Dark2",
+                      labels = c("Female (N = 29)", "Male (N = 21)")) +
+  scale_fill_brewer(palette = "Dark2", direction = -1,
                     name = "Sex",
-                    labels = c("Female", "Male"))
-
-ind_prop_molt_scores %>% 
-  mutate(fit.m = predict(mod1, re.form = NA), 
-         fit.c = predict(mod1, re.form = NULL)) %>% 
-  ggplot() +
-  geom_line(aes(x = date, y = fit.c, group = Rings_comb, color = sex)) +
-  # geom_ribbon(data = ., 
-  #             aes(x = date, ymax = conf.high, ymin = conf.low, fill = sex),
-  #             lwd = 1, alpha = 0.25) +
-  # geom_point(data = mod1_fits,
-  #            aes(x = date, y = predicted, fill = sex),
-  #            shape = 21, size = 2) +
-  luke_theme +
-  theme(legend.position = c(0.2, 0.2),
-        legend.justification = c(1, 0),
-        strip.background = element_blank(),
-        axis.title.x = element_blank(),
-        axis.text.x = element_text(size = 10, 
-                                   angle = 45, 
-                                   hjust = 1, 
-                                   vjust = 1)) +
-  ylab("proportion of breeding plumage") +
-  scale_x_date(date_labels = "%B", 
-               expand = c(0.01, 0.01), 
-               date_breaks = "1 month") +
-  scale_colour_brewer(palette = "Dark2",
-                      name = "Sex",
-                      labels = c("Female", "Male")) +
-  scale_fill_brewer(palette = "Dark2",
-                    name = "Sex",
-                    labels = c("Female", "Male"))
+                    labels = c("Female (N = 29)", "Male (N = 21)"))
 ```
