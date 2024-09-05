@@ -134,7 +134,7 @@ luke_theme <-
     axis.ticks = element_line(linewidth = 0.5, colour = "grey40"),
     axis.ticks.length = unit(0.2, "cm"),
     panel.border = element_rect(linetype = "solid", colour = "grey"),
-    legend.position = c(0.1, 0.9)
+    legend.position.inside = c(0.1, 0.9)
   )
 ```
 
@@ -144,8 +144,7 @@ This dataset contains the scored moult data for all usable photos from the
 ```{r}
 # import data with all columns as character (so that no auto-formatting is done by R)
 dat <- 
-  read.csv(here("data/Data_21_22.csv"), colClasses = "character") %>% 
-  bind_rows(., read.csv(here("data/Data_22_23.csv"), colClasses = "character"))
+  read.csv(here("D:/IRT/Dotterel molt - IRT2/R/data/Dataset21_24.csv"), colClasses = "character")
 
 # check values of Date column for mistakes...looks good
 unique(dat$Date)
@@ -249,6 +248,27 @@ ggplot(data = dat %>% filter(season == 2022) %>% mutate(Score = as.numeric(Score
                date_breaks = "3 week", 
                limits = c(as.Date("2022-07-05"), as.Date("2023-05-01"))) +
   xlab("week")
+
+
+
+# 2023-2024 season data 
+ggplot(data = dat %>% filter(season == 2023) %>% mutate(Score = as.numeric(Score))) +
+  geom_point(aes(y = 1, x = date, fill = Score), 
+             pch = 21, color = "black", size = 3) +
+  facet_wrap(. ~ Rings_comb, ncol = 1, strip.position = "right") +
+  scale_fill_gradient(high = "#cc4c02", low = "white") +
+  theme_bw() +
+  theme(axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.ticks = element_blank(),
+        strip.text.y.right = element_text(angle = 0)) +
+  scale_x_date(date_labels = "%W", expand = c(0.01, 0.01), 
+               date_breaks = "3 week", 
+               limits = c(as.Date("2023-07-05"), as.Date("2024-05-01"))) +
+  xlab("week")
+
 ```
 
 ### sex-specific differences in breeding plumage
@@ -257,17 +277,28 @@ ggplot(data = dat %>% filter(season == 2022) %>% mutate(Score = as.numeric(Score
 # extract the core breeding months (i.e., when presumably all birds are at their maximum breeding plumage), and determine the maximum score for each individual. Note: only looking at 2021-2022 season as it has the most even coverage across the breeding season
 ind_breeding_scores <- 
   dat %>% 
-  filter(season == 2021) %>%
+  #filter(season == 2021) %>%
   mutate(Score = as.numeric(Score)) %>% 
   mutate(breeding_season = ifelse(month(date) %in% c(8, 9, 10, 11), 1, 0)) %>% 
   filter(breeding_season == 1) %>% 
-  group_by(Rings_comb, sex) %>% 
+  group_by(season, Rings_comb, sex) %>% 
   summarise(max_breeding_score = max(Score))
 
 # Assess sample sizes of each sex
 ind_breeding_scores %>% 
   group_by(sex) %>% 
   summarise(n_distinct(Rings_comb))
+
+
+#linear mixed model for the difference in max score between sexes
+mod2 <- lmer(max_breeding_score ~  sex +
+         (1 | Rings_comb) + (1|season) , 
+              data = ind_breeding_scores)
+
+summary(mod2)
+plot(allEffects(mod2))
+
+
 
 # density plot of sex-specific breeding plumage score distributions
 ggplot() +
@@ -292,19 +323,20 @@ ggplot() +
 # calcualte the individual proportional moult scores by comparing each score to a given individual's max (determined in previous chunk). Note: only looking at 2021-2022 season at this stage due to more even coverage of Ailsa's photos across the season.
 ind_prop_molt_scores <- 
   dat %>% 
-  filter(season == 2021) %>% 
+  #filter(season == 2021) %>% 
   mutate(Score = as.numeric(Score)) %>% 
-  left_join(., select(ind_breeding_scores, !sex), by = "Rings_comb") %>% 
+  left_join(., select(ind_breeding_scores, -sex), by = c("Rings_comb","season")) %>% 
   filter(!is.na(max_breeding_score)) %>% 
-  mutate(prop_molt_score = Score/max_breeding_score)
+  mutate(prop_molt_score = (Score-1)/(max_breeding_score-1))
 
 # mixed effects binomial model comparing sex and date effect on the changes in moult scores
 mod1 <- 
   lme4::glmer(prop_molt_score ~ 
          date_J + sex +
-         (1 | Rings_comb),
+         (1 | Rings_comb) + (1|season),
        data = ind_prop_molt_scores, 
-       family = binomial)
+       family = binomial,
+       control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e+06)))
 
 # strong date effect, but no sex effect
 tbl_regression(mod1, intercept = TRUE, 
@@ -314,6 +346,7 @@ tbl_regression(mod1, intercept = TRUE,
 pr <- ggeffects::predict_response(mod1, c("date_J [30:293]", "sex"))
 
 # back-transform the dates (i.e., Julian dates were optimized for Austral summer)
+### How can I apply this code to all seasons?
 dates_for_plot <- 
   data.frame(date = as.Date((filter(dat, season == 2021) %>% 
                                pull(date) %>% min()):
