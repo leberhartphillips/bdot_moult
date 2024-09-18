@@ -16,6 +16,9 @@ author:
  - name: Ailsa Howard
    affiliations:
      - ref: ah
+ - name: Tony Habraken
+   affiliations:
+     - ref: th
  - name: Emma Williams
    affiliations:
      - ref: ew
@@ -32,6 +35,9 @@ affiliations:
  - id: ah
    number: 2
    name: South Bay Banded Dotterel Project, Kaikoura, New Zealand
+ - id: th
+   number: 2
+   name: Port Waikato Banded Dotterel Project, Port Waikato, New Zealand
  - id: ew
    number: 3
    name: Department of Conservation, Christchurch, New Zealand
@@ -680,3 +686,9 @@ ggplot() +
                     name = "Sex",
                     labels = c("Female (N = 31)", "Male (N = 21)"))
 ```
+
+To do:
+  - add "max breeding plumage score" as factor to moult timing dynamics
+  - if there is colinearity issues between sex and max plumage score (likey), the consider standardizing within sex
+  - repeatability of moult timing analysis
+
