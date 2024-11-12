@@ -292,7 +292,7 @@ ind_breeding_scores %>%
 
 #linear mixed model for the difference in max score between sexes
 mod2 <- lmer(max_breeding_score ~  sex +
-         (1 | Rings_comb) + (1|season) , 
+              (1|season) , 
               data = ind_breeding_scores)
 
 summary(mod2)
