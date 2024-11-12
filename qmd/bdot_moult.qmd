@@ -85,7 +85,8 @@ packages_required_in_project <- c("tidyverse",
                                   "ggpattern",
                                   "gtsummary",
                                   "effects",
-                                  "lattice")
+                                  "lattice",
+                                  "rptR")
                                   
 # of the required packages, check if some need to be installed
 new.packages <- 
@@ -144,7 +145,7 @@ This dataset contains the scored moult data for all usable photos from the
 ```{r}
 # import data with all columns as character (so that no auto-formatting is done by R)
 dat <- 
-  read.csv(here("D:/IRT/Dotterel molt - IRT2/R/data/Dataset21_24.csv"), colClasses = "character")
+  read.csv(here("data/Dataset_Molt_Final - modified 7.11.2024.csv"), colClasses = "character")
 
 # check values of Date column for mistakes...looks good
 unique(dat$Date)
@@ -157,8 +158,7 @@ unique(dat$Rings_comb)
 
 # import sex information
 dat_sexes <- 
-  read.csv(here("data/bdot_sexes.csv"), colClasses = "character") %>% 
-  rename(Rings_comb = Bands_comb) %>% 
+  read.csv(here("data/sex_status_banding.csv"), colClasses = "character") %>% 
   mutate(Rings_comb = str_sub(Rings_comb, 1, 4))
 
 dat_sexes %>% pull(Rings_comb) %>% unique() %>% length()
@@ -181,17 +181,27 @@ dat <-
   # join the sexes provided by Ailsa
   left_join(., dat_sexes, by = "Rings_comb") %>% 
   # remove individuals with unknown sex
-  filter(sex != "U")
+  filter(sex != "U") %>% 
+  mutate(
+    banding_date = paste(substring(banding_date, first = 7, last = 10), 
+                        substring(banding_date, first = 4, last = 5),
+                        substring(banding_date, first = 1, last = 2),
+                       sep = "-") %>% as.Date(),
+    season_ringed = ifelse(Age_at_Banding  == "P" , 
+                           ifelse(month(banding_date) < 7, year(banding_date) - 1, year(banding_date)),
+                           NA),
+    age = ifelse(Age_at_Banding == "P", as.numeric(season - season_ringed), NA))# i should find a better way to calculate age
 
+  
 dat %>% 
   group_by(season) %>% 
   summarise(n_obs = n())
 
-# summarize the number of individuals in the dataset...64 unique combos
+# summarize the number of individuals in the dataset...87 unique combos
 dat %>%
   pull(Rings_comb) %>% unique() %>% length()
 
-# summarise the number of seasons for each individual...47 have more than one season of data
+# summarise the number of seasons for each individual...54 have more than one season of data
 dat %>%
   select(Rings_comb, season) %>% 
   distinct() %>% 
@@ -207,11 +217,7 @@ dat %>%
   summarise(n_photos = n()) %>% 
   arrange(desc(n_photos))
 
-# summarise the number of usable photos for each individual...
-dat %>%
-  group_by(Rings_comb, season) %>% 
-  summarise(n_photos = n()) %>% 
-  arrange(desc(n_photos))
+
 
 # 2021-2022 season data
 ggplot(data = dat %>% filter(season == 2021) %>% mutate(Score = as.numeric(Score))) +
@@ -281,8 +287,9 @@ ind_breeding_scores <-
   mutate(Score = as.numeric(Score)) %>% 
   mutate(breeding_season = ifelse(month(date) %in% c(8, 9, 10, 11), 1, 0)) %>% 
   filter(breeding_season == 1) %>% 
-  group_by(season, Rings_comb, sex) %>% 
-  summarise(max_breeding_score = max(Score))
+  group_by(season, Rings_comb, sex, age) %>% 
+  summarise(max_breeding_score = max(Score)) %>% 
+  ungroup()
 
 # Assess sample sizes of each sex
 ind_breeding_scores %>% 
@@ -309,13 +316,13 @@ ggplot() +
         axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
         legend.position = c(0.15, 0.9)) +
-  xlab("maximum individual breeding plumage score") +
+  xlab("Maximum individual breeding plumage score") +
   scale_colour_brewer(palette = "Dark2", direction = -1,
                       name = "Sex",
-                      labels = c("Female (N = 29)", "Male (N = 21)")) +
+                      labels = c("Female (N = 40)", "Male (N = 29)")) +
   scale_fill_brewer(palette = "Dark2", direction = -1,
                     name = "Sex",
-                    labels = c("Female (N = 29)", "Male (N = 21)"))
+                    labels = c("Female (N = 40)", "Male (N = 29)"))
 ```
 
 ### within-individual moult dynamics
@@ -325,14 +332,14 @@ ind_prop_molt_scores <-
   dat %>% 
   #filter(season == 2021) %>% 
   mutate(Score = as.numeric(Score)) %>% 
-  left_join(., select(ind_breeding_scores, -sex), by = c("Rings_comb","season")) %>% 
+  left_join(., select(ind_breeding_scores, -sex, -age), by = c("Rings_comb","season")) %>% 
   filter(!is.na(max_breeding_score)) %>% 
   mutate(prop_molt_score = (Score-1)/(max_breeding_score-1))
 
 # mixed effects binomial model comparing sex and date effect on the changes in moult scores
 mod1 <- 
   lme4::glmer(prop_molt_score ~ 
-         date_J + sex +
+         date_J * sex +
          (1 | Rings_comb) + (1|season),
        data = ind_prop_molt_scores, 
        family = binomial,
@@ -386,8 +393,216 @@ ggplot() +
                date_breaks = "1 month") +
   scale_colour_brewer(palette = "Dark2", direction = -1,
                       name = "Sex",
-                      labels = c("Female (N = 29)", "Male (N = 21)")) +
+                      labels = c("Female (N = 40)", "Male (N = 29)")) +
   scale_fill_brewer(palette = "Dark2", direction = -1,
                     name = "Sex",
-                    labels = c("Female (N = 29)", "Male (N = 21)"))
+                    labels = c("Female (N = 40)", "Male (N = 29)"))
+```
+
+
+### Repeatability in maximum moult score
+
+```{r}
+# birds have consistent molt scores across years (estimated repeatability of molt scores = 0.623)
+
+repeatability_test <- rpt(max_breeding_score ~ (1 | Rings_comb),
+                            grname = "Rings_comb",
+                            data = ind_breeding_scores,
+                            datatype = "Gaussian",
+                            nboot = 1000,  # Number of bootstrap samples for confidence intervals
+                            npermut = 0)
+
+# Print the results
+print(repeatability_test)
+
+```
+
+### Migratory status
+
+```{r}
+
+#transform the migratory status to factor
+ind_prop_molt_scores$migratory_status <- as.factor(ind_prop_molt_scores$migratory_status)
+
+#keep only the ones with a known migratory status
+ind_prop_molt_scores2 <- ind_prop_molt_scores %>%
+  filter(migratory_status == "M" | migratory_status == "R")
+
+# summarize the number of individuals with migratory status...17 unique combos
+ind_prop_molt_scores2 %>%
+  pull(Rings_comb) %>% unique() %>% length()
+
+
+# summarise the number of usable photos for each individual...
+ind_prop_molt_scores2 %>%
+  group_by(Rings_comb, season) %>% 
+  summarise(n_photos = n()) %>% 
+  arrange(desc(n_photos))
+
+# summerise the number of migratory and resident birds (M = 5, R = 12)
+ind_prop_molt_scores2 %>% 
+  group_by(migratory_status) %>% 
+  summarise(n_distinct(Rings_comb))
+
+
+
+mod3 <- 
+  lme4::glmer(prop_molt_score ~ 
+         date_J * migratory_status +
+         (1 | Rings_comb) + (1|season),
+       data = ind_prop_molt_scores2, 
+       family = binomial,
+       control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e+06)))
+
+summary(mod3)
+plot(allEffects(mod3), type = "response")
+
+
+# strong date effect, but no Migratory Status effect
+tbl_regression(mod3, intercept = TRUE, 
+               label = list(date_J ~ "Date", migratory_status ~ "Migratory Status"))
+
+# extract predicted trends
+pr3 <- ggeffects::predict_response(mod3, c("date_J [30:293]", "migratory_status"))
+
+
+# join the back-transformed dates to model fits
+mod3_fits <- 
+  as.data.frame(pr3) %>% 
+  rename(date_J = x,
+         migratory_status = group) %>% 
+  left_join(., dates_for_plot, by = "date_J")
+
+# plot the model
+ggplot() +
+  geom_line(data = mod3_fits, 
+            aes(x = date, y = predicted, color = migratory_status)) +
+  geom_ribbon(data = mod3_fits, 
+              aes(x = date, ymax = conf.high, ymin = conf.low, fill = migratory_status),
+              lwd = 1, alpha = 0.25) +
+  luke_theme +
+  theme(legend.position = c(0.3, 0.2),
+        legend.justification = c(1, 0),
+        strip.background = element_blank(),
+        axis.title.x = element_blank(),
+        axis.text.x = element_text(size = 10, 
+                                   angle = 45, 
+                                   hjust = 1, 
+                                   vjust = 1)) +
+  ylab("proportion of breeding plumage") +
+  scale_x_date(date_labels = "%B", 
+               expand = c(0.01, 0.01), 
+               date_breaks = "1 month") +
+  scale_colour_brewer(palette = "Dark2", direction = -1,
+                      name = "Migratory Status",
+                      labels = c("Migratory (N = 5)", "Resident (N = 12)")) +
+  scale_fill_brewer(palette = "Dark2", direction = -1,
+                    name = "Migratory Status",
+                    labels = c("Migratory (N = 5)", "Resident (N = 12)"))
+
+
+
+```
+
+
+### Age 
+
+```{r}
+
+# Does the maximum score differ with aging?
+# No change in max moult score with aging
+
+mod4<- lmer(max_breeding_score ~ age*sex  + (1 | Rings_comb)+ (1|season),
+       data = ind_breeding_scores, 
+       control = lmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e+06)))
+
+
+summary(mod4)
+plot(allEffects(mod4))
+
+# no effect of age
+tbl_regression(mod4, intercept = TRUE, 
+               label = list(age ~ "Age", sex ~ "Sex"))
+
+
+###########################################################
+
+# Does age affect the speed of moulting?
+
+
+ind_prop_molt_scores3 <- ind_prop_molt_scores %>% 
+  filter(!is.na(age)) 
+  
+
+# summarize the number of individuals with known age ...19 unique combos (only the ones ringed as chicks)
+ind_prop_molt_scores3 %>%
+  pull(Rings_comb) %>% unique() %>% length()
+
+
+# summarise the number of usable photos for each individual...
+ind_prop_molt_scores3 %>%
+  group_by(Rings_comb, season) %>% 
+  summarise(n_photos = n()) %>% 
+  arrange(desc(n_photos))
+
+# summerise the number of birds in each age group (1 = 5, 2 = 5, 3 = 12, 4 = 10, 5 = 1)
+ind_prop_molt_scores3 %>% 
+  group_by(age) %>% 
+  summarise(n_distinct(Rings_comb))
+
+
+
+mod5 <- 
+  lme4::glmer(prop_molt_score ~ 
+         date_J * age +
+         (1 | Rings_comb) ,
+       data = ind_prop_molt_scores3, 
+       family = binomial,
+       control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e+10)))
+
+summary(mod5)
+plot(allEffects(mod5))
+
+
+
+# extract predicted trends
+pr5 <- ggeffects::predict_response(mod5, c("date_J [30:293]", "age"))
+
+
+# join the back-transformed dates to model fits
+mod5_fits <- 
+  as.data.frame(pr5) %>% 
+  rename(date_J = x,
+         age = group) %>% 
+  left_join(., dates_for_plot, by = "date_J")
+
+# plot the model
+ggplot() +
+  geom_line(data = mod5_fits, 
+            aes(x = date, y = predicted, color = age)) +
+  geom_ribbon(data = mod5_fits, 
+              aes(x = date, ymax = conf.high, ymin = conf.low, fill = age),
+              lwd = 1, alpha = 0.1) +
+  luke_theme +
+  theme(legend.position = c(0.3, 0.2),
+        legend.justification = c(1, 0),
+        strip.background = element_blank(),
+        axis.title.x = element_blank(),
+        axis.text.x = element_text(size = 10, 
+                                   angle = 45, 
+                                   hjust = 1, 
+                                   vjust = 1)) +
+  ylab("proportion of breeding plumage") +
+  scale_x_date(date_labels = "%B", 
+               expand = c(0.01, 0.01), 
+               date_breaks = "1 month") +
+  scale_colour_brewer(palette = "Dark2", direction = -1,
+                      name = "Age",
+                      labels = c("1 year (N = 5)", "2 years (N = 5)", 
+                                 "3 years (N = 12)","4 years (N = 10)", "5 years (N = 1)")) +
+  scale_fill_brewer(palette = "Dark2", direction = -1,
+                    name = "Age",
+                    labels = c("1 year (N = 5)", "2 years (N = 5)", 
+                                 "3 years (N = 12)","4 years (N = 10)", "5 years (N = 1)"))
+
 ```
