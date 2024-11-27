@@ -1429,9 +1429,11 @@ left_join(breeding_data_2021, breeding_data_2021_, by = "nest_id") %>%
   mutate(days_diff = last_date_breeding_ - last_date_breeding) %>% 
   arrange(desc(days_diff)) %>% 
   mutate(last_date_breeding_final = as.Date(ifelse(days_diff > 0, last_date_breeding + ceiling(days_diff/2), last_date_breeding))) %>% 
-  arrange(desc(last_date_breeding_final))
+  arrange(desc(last_date_breeding_final)) %>% 
+  select(parent, last_date_breeding_final) %>% 
+  # specify the season as the first calender year
+  mutate(season = ifelse(month(last_date_breeding_final) < 7, year(last_date_breeding_final) - 1, year(last_date_breeding_final)))
 ```
-
 
 ### 13-Nov-24: meeting notes (Bart, Luke, and Bashar via zoom)
 - add the breeding data to the analysis: for each individual include the date of last breeding (i.e., last date seen with nest or brood) as a predictor of molt timing. Also do an analysis relating the timing of last breeding to the age of the individual. Bashar will send Luke the breeding data he received from Ted.
