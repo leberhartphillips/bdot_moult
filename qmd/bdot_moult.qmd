@@ -1259,7 +1259,7 @@ ggplot() +
 
 ### within-individual moult dynamics (age)
 ```{r}
-# calculate the individual proportional moult scores by comparing each score to a given individual's max (determined in previous chunk). Piece apart variation in migratory status.
+# calculate the individual proportional moult scores by comparing each score to a given individual's max (determined in previous chunk). Piece apart variation between age groups.
 ind_prop_molt_scores <- 
   dat %>% 
   mutate(score = as.numeric(score)) %>% 
@@ -1341,6 +1341,8 @@ ggplot() +
 ```{r}
 # explore datasets provided by Ted
 
+## 2021 season
+
 # import and consolidate key columns
 breeding_data_2021 <- 
   read_excel(here("data/Kaikoura_Dotterel_2021_Feb2022_upd_Nov22_Locations.xlsx"), 
@@ -1419,7 +1421,7 @@ breeding_data_2021_ <-
   mutate(nest_id = sub("^([^[:space:]]+).*", "\\1", `Nest ID`)) %>% 
   select(OBJECTID, nest_id, found_date, hatch_date, fail_date)
 
-left_join(breeding_data_2021, breeding_data_2021_, by = "nest_id") %>%
+breeding_2021_final <- left_join(breeding_data_2021, breeding_data_2021_, by = "nest_id") %>%
   mutate(date_check = ifelse((!is.na(found_date) & is.na(fail_date) & is.na(hatch_date)) | 
                                ((!is.na(hatch_date) & found_date < hatch_date)) | 
                                ((!is.na(fail_date) & !is.na(hatch_date)) & hatch_date < fail_date) |
@@ -1433,6 +1435,254 @@ left_join(breeding_data_2021, breeding_data_2021_, by = "nest_id") %>%
   select(parent, last_date_breeding_final) %>% 
   # specify the season as the first calender year
   mutate(season = ifelse(month(last_date_breeding_final) < 7, year(last_date_breeding_final) - 1, year(last_date_breeding_final)))
+
+###########
+
+## 2022 season
+
+# import and consolidate key columns
+breeding_data_2022 <- 
+  read_excel(here("data/Kaikoura_Dotterel_Jan23_upd.xlsx"), 
+                     sheet = "Kaikoura_NestVisit_1", 
+                     col_types = "text") %>%
+  mutate(visit_date_ = as.POSIXct(as.numeric(`Visit Date`) * 86400, origin = "1899-12-30", tz = "UTC")) %>% 
+  mutate(visit_date_nz = with_tz(visit_date_, tzone = "Pacific/Auckland")) %>% 
+  mutate(date = as.Date(visit_date_nz)) %>% 
+  select(OBJECTID, NestID, date, `Nest Status`, `Egg count`, `Number Hatched`, Notes, `Number Fledged`, `Number of chicks seen`) %>% 
+  rename(nest_fate = `Nest Status`,
+         eggs = `Egg count`,
+         hatched = `Number Hatched`,
+         fledged = `Number Fledged`,
+         chicks = `Number of chicks seen`)
+
+
+# Apply the function to the text column and store the results in new columns
+extracted_parents2 <- t(sapply(breeding_data_2022$NestID, extract_patterns))
+
+breeding_data_2022 <-
+  bind_cols(breeding_data_2022, extracted_parents2) %>% 
+  select(-parent2) %>% 
+  rename(parent = parent1) %>% 
+  bind_rows(bind_cols(breeding_data_2022, extracted_parents2) %>% 
+              select(-parent1) %>% 
+              rename(parent = parent2)) %>% 
+  filter(!is.na(parent)) %>% 
+  filter(parent %in% (dat %>% filter(season == 2022) %>% pull(rings_comb) %>% unique())) %>%
+  filter(nest_fate == "Occupied" | as.numeric(chicks) > 0) %>%
+  group_by(parent) %>%
+  arrange(desc(date)) %>%
+  slice(1) %>%
+  ungroup() %>%
+  arrange(desc(date)) %>%
+  mutate(nest_id = sub("^([^[:space:]]+).*", "\\1", NestID)) %>%
+  rename(last_date_breeding = date) %>% 
+  select(parent, last_date_breeding, nest_id, OBJECTID)
+
+# import and consolidate key columns
+breeding_data_2022_ <-
+  read_excel(here("data/Kaikoura_Dotterel_Jan23_upd.xlsx"), 
+                     sheet = "Kaikoura_DotterelNest_0", 
+                     col_types = "text") %>%
+  mutate(hatch_date_ = as.POSIXct(as.numeric(`Date Hatched`) * 86400, origin = "1899-12-30", tz = "UTC"),
+         fail_date_ = as.POSIXct(as.numeric(`Date Failed`) * 86400, origin = "1899-12-30", tz = "UTC"),
+         found_date_ = as.POSIXct(as.numeric(`Date Found`) * 86400, origin = "1899-12-30", tz = "UTC")) %>% 
+  mutate(hatch_date_nz = with_tz(hatch_date_, tzone = "Pacific/Auckland"),
+         fail_date_nz = with_tz(fail_date_, tzone = "Pacific/Auckland"),
+         found_date_nz = with_tz(found_date_, tzone = "Pacific/Auckland")) %>% 
+  mutate(hatch_date = as.Date(hatch_date_nz),
+         fail_date = as.Date(fail_date_nz),
+         found_date = as.Date(found_date_nz)) %>%
+  mutate(nest_id = sub("^([^[:space:]]+).*", "\\1", `Nest ID`)) %>% 
+  select(OBJECTID, nest_id, found_date, hatch_date, fail_date)
+
+breeding_2022_final <- left_join(breeding_data_2022, breeding_data_2022_, by = "nest_id") %>%
+  mutate(date_check = ifelse((!is.na(found_date) & is.na(fail_date) & is.na(hatch_date)) | 
+                               ((!is.na(hatch_date) & found_date < hatch_date)) | 
+                               ((!is.na(fail_date) & !is.na(hatch_date)) & hatch_date < fail_date) |
+                               ((!is.na(fail_date) & found_date < fail_date)), 1, 0)) %>% 
+  group_by(parent) %>% 
+  mutate(last_date_breeding_ = max(found_date, hatch_date, fail_date, na.rm = TRUE)) %>% 
+  mutate(days_diff = last_date_breeding_ - last_date_breeding) %>% 
+  arrange(desc(days_diff)) %>% 
+  mutate(last_date_breeding_final = as.Date(ifelse(days_diff > 0, last_date_breeding + ceiling(days_diff/2), last_date_breeding))) %>% 
+  arrange(desc(last_date_breeding_final)) %>% 
+  select(parent, last_date_breeding_final) %>% 
+  # specify the season as the first calender year
+  mutate(season = ifelse(month(last_date_breeding_final) < 7, year(last_date_breeding_final) - 1, year(last_date_breeding_final)))
+
+
+
+###########
+
+## 2023 season
+
+# import and consolidate key columns
+breeding_data_2023 <- 
+  read_excel(here("data/Kaikoura_Dotterel_Feb2024_upd.xlsx"), 
+                     sheet = "Kaikoura_NestVisit_1", 
+                     col_types = "text") %>%
+  mutate(visit_date_ = as.POSIXct(as.numeric(`Visit Date`) * 86400, origin = "1899-12-30", tz = "UTC")) %>% 
+  mutate(visit_date_nz = with_tz(visit_date_, tzone = "Pacific/Auckland")) %>% 
+  mutate(date = as.Date(visit_date_nz)) %>% 
+  select(OBJECTID, NestID, date, `Nest Status`, `Egg count`, `Number Hatched`, Notes, `Number Fledged`, `Number of chicks seen`) %>% 
+  rename(nest_fate = `Nest Status`,
+         eggs = `Egg count`,
+         hatched = `Number Hatched`,
+         fledged = `Number Fledged`,
+         chicks = `Number of chicks seen`)
+
+
+# Apply the function to the text column and store the results in new columns
+extracted_parents3 <- t(sapply(breeding_data_2023$NestID, extract_patterns))
+
+breeding_data_2023 <-
+  bind_cols(breeding_data_2023, extracted_parents3) %>% 
+  select(-parent2) %>% 
+  rename(parent = parent1) %>% 
+  bind_rows(bind_cols(breeding_data_2023, extracted_parents3) %>% 
+              select(-parent1) %>% 
+              rename(parent = parent2)) %>% 
+  filter(!is.na(parent)) %>% 
+  filter(parent %in% (dat %>% filter(season == 2023) %>% pull(rings_comb) %>% unique())) %>%
+  filter(nest_fate == "Occupied" | as.numeric(chicks) > 0) %>%
+  group_by(parent) %>%
+  arrange(desc(date)) %>%
+  slice(1) %>%
+  ungroup() %>%
+  arrange(desc(date)) %>%
+  mutate(nest_id = sub("^([^[:space:]]+).*", "\\1", NestID)) %>%
+  rename(last_date_breeding = date) %>% 
+  select(parent, last_date_breeding, nest_id, OBJECTID)
+
+# import and consolidate key columns
+breeding_data_2023_ <-
+  read_excel(here("data/Kaikoura_Dotterel_Feb2024_upd.xlsx"), 
+                     sheet = "Kaikoura_DotterelNest_0", 
+                     col_types = "text") %>%
+  mutate(hatch_date_ = as.POSIXct(as.numeric(`Date Hatched`) * 86400, origin = "1899-12-30", tz = "UTC"),
+         fail_date_ = as.POSIXct(as.numeric(`Date Failed`) * 86400, origin = "1899-12-30", tz = "UTC"),
+         found_date_ = as.POSIXct(as.numeric(`Date Found`) * 86400, origin = "1899-12-30", tz = "UTC")) %>% 
+  mutate(hatch_date_nz = with_tz(hatch_date_, tzone = "Pacific/Auckland"),
+         fail_date_nz = with_tz(fail_date_, tzone = "Pacific/Auckland"),
+         found_date_nz = with_tz(found_date_, tzone = "Pacific/Auckland")) %>% 
+  mutate(hatch_date = as.Date(hatch_date_nz),
+         fail_date = as.Date(fail_date_nz),
+         found_date = as.Date(found_date_nz)) %>%
+  mutate(nest_id = sub("^([^[:space:]]+).*", "\\1", `Nest ID`)) %>% 
+  select(OBJECTID, nest_id, found_date, hatch_date, fail_date)
+
+breeding_2023_final <- left_join(breeding_data_2023, breeding_data_2023_, by = "nest_id") %>%
+  mutate(date_check = ifelse((!is.na(found_date) & is.na(fail_date) & is.na(hatch_date)) | 
+                               ((!is.na(hatch_date) & found_date < hatch_date)) | 
+                               ((!is.na(fail_date) & !is.na(hatch_date)) & hatch_date < fail_date) |
+                               ((!is.na(fail_date) & found_date < fail_date)), 1, 0)) %>% 
+  group_by(parent) %>% 
+  mutate(last_date_breeding_ = max(found_date, hatch_date, fail_date, na.rm = TRUE)) %>% 
+  mutate(days_diff = last_date_breeding_ - last_date_breeding) %>% 
+  arrange(desc(days_diff)) %>% 
+  mutate(last_date_breeding_final = as.Date(ifelse(days_diff > 0, last_date_breeding + ceiling(days_diff/2), last_date_breeding))) %>% 
+  arrange(desc(last_date_breeding_final)) %>% 
+  select(parent, last_date_breeding_final) %>% 
+  # specify the season as the first calender year
+  mutate(season = ifelse(month(last_date_breeding_final) < 7, year(last_date_breeding_final) - 1, year(last_date_breeding_final)))
+
+
+# combine breeding data from the 3 seasons into one table
+
+breeding_data_all <- bind_rows(breeding_2021_final,breeding_2022_final,breeding_2023_final) %>% 
+  rename(rings_comb = parent) %>% 
+  # change to Julian date shifted for the Southern Hemisphere (1 = July 1)
+  mutate(breeding_date_J = as.numeric(format(last_date_breeding_final + 181, "%j")))
+
+```
+
+## Moult dynamics in relation to the timing of breeding
+
+```{r}
+
+ind_prop_molt_scores <- 
+  dat %>% 
+  mutate(score = as.numeric(score)) %>% 
+  left_join(., select(ind_breeding_scores, -sex), by = c("rings_comb","season")) %>% 
+  filter(!is.na(max_breeding_score)) %>% 
+  mutate(prop_molt_score = (score-1)/(max_breeding_score-1)) %>%
+  select(rings_comb, season, date_J, sex, migratory_status, age, score, max_breeding_score, prop_molt_score) %>% 
+  arrange(rings_comb, season, date_J) %>% 
+  distinct() %>% 
+  filter(!is.na(prop_molt_score)) %>% 
+  full_join(breeding_data_all, by = c("rings_comb", "season"))
+
+
+
+
+mod1_breeding <- 
+  lme4::glmer(prop_molt_score ~ 
+                 date_J * breeding_date_J +
+         (1 | rings_comb),
+       data = ind_prop_molt_scores, 
+       family = binomial)
+
+summary(mod1_breeding)
+
+plot(allEffects(mod1_breeding), type = "response")
+
+
+
+
+# strong date effect, but no status effect
+tbl_regression(mod1_breeding, intercept = TRUE, 
+               label = list(date_J ~ "Date", breeding_date_J ~ "Breeding timing"))
+
+# extract predicted trends
+# I tried the whole range for the breeding timing (breeding_date_J [72:221]), but then decided to take some values with 20 days interval to visualize it better
+pr <- ggeffects::predict_response(mod1_breeding, c("date_J[30:293]", "breeding_date_J [80,100,120,140,160,180,200,220]"))
+
+dates_for_plot <-
+  data.frame(date = as.Date(c(as.Date("2021-07-01"):as.Date("2022-06-30"))),
+             date_J = c(1:365))
+
+# join the back-transformed dates to model fits
+mod1_fits <- 
+  as.data.frame(pr) %>% 
+  rename(date_J = x,
+         breeding_date_J = group) %>% 
+  left_join(., dates_for_plot, by = "date_J")
+
+# plot the model
+ggplot() +
+  geom_line(data = mod1_fits, 
+            aes(x = date, y = predicted, color = breeding_date_J)) +
+  geom_ribbon(data = mod1_fits, 
+              aes(x = date, ymax = conf.high, ymin = conf.low, fill = breeding_date_J),
+              lwd = 1, alpha = 0.25) +
+  luke_theme +
+  theme(legend.position = c(0.3, 0.2),
+        legend.justification = c(1, 0),
+        strip.background = element_blank(),
+        axis.title.x = element_blank(),
+        axis.text.x = element_text(size = 10, 
+                                   angle = 45, 
+                                   hjust = 1, 
+                                   vjust = 1)) +
+  ylab("proportion intact of individual-based maximum rufous band")
+
+
+########### How the timing of breeding change with aging
+
+# when males age they stay breeding later in the season, but the opposite in females
+mod2_breeding <- 
+  lme4::lmer(breeding_date_J ~ 
+                 sex * age +
+         (1 | rings_comb),
+       data = ind_prop_molt_scores)
+
+summary(mod2_breeding)
+
+plot(allEffects(mod2_breeding), type = "response")
+
+
+
+
 ```
 
 ### 13-Nov-24: meeting notes (Bart, Luke, and Bashar via zoom)
