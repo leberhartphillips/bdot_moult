@@ -252,6 +252,27 @@ dat %>%
   summarise(n_photos = n()) %>% 
   arrange(desc(n_photos))
 
+dat %>% 
+  dplyr::select(rings_comb, migratory_status) %>% 
+  # filter(rings_comb == "RWLB") %>% 
+  # mutate(month = month(date)) %>% 
+  filter(rings_comb %in% c("RBOG", "RBGB", "RROW", "RBWO", "RRGO", "RBWR", "RLYL", "RWBG", "RLYR", "RRBR", "RBBY", "RWBY", "RRLR", "RRYY", "RWLB")) %>%
+  # filter(month(date) < 9 & month(date) > 2) %>%
+  # dplyr::select(rings_comb, season, month, date) %>% 
+  distinct() %>% 
+  filter(migratory_status == "R")
+
+dat %>% 
+  dplyr::select(rings_comb, sourcefile, date) %>% 
+  # filter(rings_comb == "RWLB") %>% 
+  # mutate(month = month(date)) %>% 
+  # filter(rings_comb %in% c("RBOG", "RBGB", "RROW", "RBWO", "RRGO", "RBWR", "RLYL", "RWBG", "RLYR", "RRBR", "RBBY", "RWBY", "RRLR", "RRYY", "RWLB")) %>%
+  filter(rings_comb == "RBRL") %>% 
+  # filter(month(date) < 9 & month(date) > 2) %>%
+  # dplyr::select(rings_comb, season, month, date) %>% 
+  distinct() %>% print(n = nrow(.))
+
+
 ```
 
 ### Plot the sampling distribution of Ailsa's photos across the seasons
@@ -1210,6 +1231,8 @@ mod1_status <-
        family = binomial,
        control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e+06)))
 
+# plot(allEffects(mod1_status))
+
 # strong date effect, but no status effect
 tbl_regression(mod1_status, intercept = TRUE, 
                label = list(date_J ~ "Date", migratory_status ~ "Migratory status"))
@@ -1286,6 +1309,8 @@ mod1_age <-
        data = ind_prop_molt_scores, 
        family = binomial)
        # control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e+06)))
+
+plot(allEffects(mod1_age))
 
 # strong date effect, but no status effect
 tbl_regression(mod1_age, intercept = TRUE, 
@@ -1596,11 +1621,10 @@ breeding_data_all <- bind_rows(breeding_2021_final,breeding_2022_final,breeding_
 
 ```
 
-## Moult dynamics in relation to the timing of breeding
+### Moult dynamics in relation to the timing of breeding
 
 ```{r}
-
-ind_prop_molt_scores <- 
+ind_prop_molt_scores_breeding_date <-
   dat %>% 
   mutate(score = as.numeric(score)) %>% 
   left_join(., select(ind_breeding_scores, -sex), by = c("rings_comb","season")) %>% 
@@ -1610,79 +1634,106 @@ ind_prop_molt_scores <-
   arrange(rings_comb, season, date_J) %>% 
   distinct() %>% 
   filter(!is.na(prop_molt_score)) %>% 
-  full_join(breeding_data_all, by = c("rings_comb", "season"))
+  full_join(breeding_data_all, by = c("rings_comb", "season")) %>% 
+  mutate(date_diff = abs(breeding_date_J - date_J)) %>% 
+  arrange(rings_comb, season, date_diff) %>% 
+  group_by(rings_comb, season) %>% slice(1) %>% filter(date_diff < 15) %>% 
+  dplyr::select(rings_comb, season, sex, breeding_date_J, prop_molt_score, max_breeding_score, age) %>% 
+  distinct()
 
-
-
-
-mod1_breeding <- 
-  lme4::glmer(prop_molt_score ~ 
-                 date_J * breeding_date_J +
+# do individuals with a fuller breeding plumage breed later?
+mod_max_score_breeding_date <- 
+  lme4::lmer(breeding_date_J ~ 
+                 max_breeding_score +
          (1 | rings_comb),
-       data = ind_prop_molt_scores, 
-       family = binomial)
+       data = ind_prop_molt_scores_breeding_date)
 
-summary(mod1_breeding)
+summary(mod_max_score_breeding_date)
 
-plot(allEffects(mod1_breeding), type = "response")
+plot(allEffects(mod_max_score_breeding_date), type = "response")
 
+# do individuals with delayed moult breed later?
+mod_prop_molt_breeding_date <- 
+  lme4::lmer(breeding_date_J ~ 
+                 prop_molt_score +
+         (1 | rings_comb),
+       data = ind_prop_molt_scores_breeding_date)
 
+summary(mod_prop_molt_breeding_date)
 
+plot(allEffects(mod_prop_molt_breeding_date), type = "response")
+```
+
+### effect of age on extended breeding period
+
+```{r}
+# wrangle data to get ages and dates of last breeding for each season of all 
+# birds available
+age_breeding_date <-
+  dat %>% 
+  select(rings_comb, season, age, sex) %>% 
+  full_join(breeding_data_all, by = c("rings_comb", "season")) %>% 
+  distinct()
+
+# do older individuals conclude their breeding season later?
+mod_age_breeding_date <- 
+  lme4::lmer(breeding_date_J ~ 
+                 age +
+         (1 | rings_comb),
+       data = age_breeding_date)
+
+summary(mod_age_breeding_date)
+
+plot(allEffects(mod_age_breeding_date), type = "response")
 
 # strong date effect, but no status effect
-tbl_regression(mod1_breeding, intercept = TRUE, 
-               label = list(date_J ~ "Date", breeding_date_J ~ "Breeding timing"))
+tbl_regression(mod_age_breeding_date, intercept = TRUE, 
+               label = list(age ~ "Age"))
 
 # extract predicted trends
 # I tried the whole range for the breeding timing (breeding_date_J [72:221]), but then decided to take some values with 20 days interval to visualize it better
-pr <- ggeffects::predict_response(mod1_breeding, c("date_J[30:293]", "breeding_date_J [80,100,120,140,160,180,200,220]"))
+pr <- ggeffects::predict_response(mod_age_breeding_date, c("age"))
 
 dates_for_plot <-
   data.frame(date = as.Date(c(as.Date("2021-07-01"):as.Date("2022-06-30"))),
-             date_J = c(1:365))
+             breeding_date_ = c(1:365))
+CL_dates_for_plot <-
+  data.frame(conf.low_date = as.Date(c(as.Date("2021-07-01"):as.Date("2022-06-30"))),
+             conf.low_ = c(1:365))
+CH_dates_for_plot <-
+  data.frame(conf.high_date = as.Date(c(as.Date("2021-07-01"):as.Date("2022-06-30"))),
+             conf.high_ = c(1:365))
 
 # join the back-transformed dates to model fits
 mod1_fits <- 
   as.data.frame(pr) %>% 
-  rename(date_J = x,
-         breeding_date_J = group) %>% 
-  left_join(., dates_for_plot, by = "date_J")
-
+  rename(age = x,
+         # sex = group,
+         breeding_date = predicted) %>% 
+  mutate(breeding_date_ = round(breeding_date),
+         conf.low_ = round(conf.low),
+         conf.high_ = round(conf.high)) %>% 
+  left_join(., dates_for_plot, by = "breeding_date_") %>% 
+  left_join(., CL_dates_for_plot, by = "conf.low_") %>% 
+  left_join(., CH_dates_for_plot, by = "conf.high_")
+  
 # plot the model
 ggplot() +
   geom_line(data = mod1_fits, 
-            aes(x = date, y = predicted, color = breeding_date_J)) +
+            aes(x = age, y = date)) +
   geom_ribbon(data = mod1_fits, 
-              aes(x = date, ymax = conf.high, ymin = conf.low, fill = breeding_date_J),
+              aes(x = age, ymax = conf.high_date, ymin = conf.low_date),
               lwd = 1, alpha = 0.25) +
   luke_theme +
-  theme(legend.position = c(0.3, 0.2),
-        legend.justification = c(1, 0),
-        strip.background = element_blank(),
-        axis.title.x = element_blank(),
-        axis.text.x = element_text(size = 10, 
-                                   angle = 45, 
-                                   hjust = 1, 
-                                   vjust = 1)) +
-  ylab("proportion intact of individual-based maximum rufous band")
-
-
-########### How the timing of breeding change with aging
-
-# when males age they stay breeding later in the season, but the opposite in females
-mod2_breeding <- 
-  lme4::lmer(breeding_date_J ~ 
-                 sex * age +
-         (1 | rings_comb),
-       data = ind_prop_molt_scores)
-
-summary(mod2_breeding)
-
-plot(allEffects(mod2_breeding), type = "response")
-
-
-
-
+  # theme(legend.position = c(0.3, 0.2),
+  #       legend.justification = c(1, 0),
+  #       strip.background = element_blank(),
+  #       axis.title.x = element_blank(),
+  #       axis.text.x = element_text(size = 10, 
+  #                                  angle = 45, 
+  #                                  hjust = 1, 
+  #                                  vjust = 1)) +
+  ylab("date of last breeding")
 ```
 
 ### 13-Nov-24: meeting notes (Bart, Luke, and Bashar via zoom)
