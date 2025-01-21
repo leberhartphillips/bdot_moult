@@ -251,31 +251,10 @@ dat %>%
   group_by(rings_comb, season) %>% 
   summarise(n_photos = n()) %>% 
   arrange(desc(n_photos))
-
-dat %>% 
-  dplyr::select(rings_comb, migratory_status) %>% 
-  # filter(rings_comb == "RWLB") %>% 
-  # mutate(month = month(date)) %>% 
-  filter(rings_comb %in% c("RBOG", "RBGB", "RROW", "RBWO", "RRGO", "RBWR", "RLYL", "RWBG", "RLYR", "RRBR", "RBBY", "RWBY", "RRLR", "RRYY", "RWLB")) %>%
-  # filter(month(date) < 9 & month(date) > 2) %>%
-  # dplyr::select(rings_comb, season, month, date) %>% 
-  distinct() %>% 
-  filter(migratory_status == "R")
-
-dat %>% 
-  dplyr::select(rings_comb, sourcefile, date) %>% 
-  # filter(rings_comb == "RWLB") %>% 
-  # mutate(month = month(date)) %>% 
-  # filter(rings_comb %in% c("RBOG", "RBGB", "RROW", "RBWO", "RRGO", "RBWR", "RLYL", "RWBG", "RLYR", "RRBR", "RBBY", "RWBY", "RRLR", "RRYY", "RWLB")) %>%
-  filter(rings_comb == "RBRL") %>% 
-  # filter(month(date) < 9 & month(date) > 2) %>%
-  # dplyr::select(rings_comb, season, month, date) %>% 
-  distinct() %>% print(n = nrow(.))
-
-
 ```
 
 ### Plot the sampling distribution of Ailsa's photos across the seasons
+#### 2021-2022 season data
 ```{r, fig.height=9}
 # 2021-2022 season data
 ggplot(data = dat %>% filter(season == 2021 & sex == "F") %>% mutate(score = as.numeric(score), 
@@ -318,7 +297,7 @@ ggplot(data = dat %>% filter(season == 2021 & sex == "M") %>% mutate(score = as.
   ggtitle("Males from the 2021-2022 breeding season in Kaikoura")
 ```
 
-
+#### 2022-2023 season data
 ```{r, fig.height=10}
 # 2022-2023 season data (not as good coverage as the previous season)
 ggplot(data = dat %>% filter(season == 2022 & sex == "F") %>% mutate(score = as.numeric(score))) +
@@ -360,7 +339,7 @@ ggplot(data = dat %>% filter(season == 2022 & sex == "M") %>% mutate(score = as.
   ggtitle("Males from the 2022-2023 breeding season in Kaikoura")
 ```
 
-
+#### 2023-2024 season data
 ```{r, fig.height=10}
 # 2023-2024 season data 
 ggplot(data = dat %>% filter(season == 2023 & sex == "F") %>% mutate(score = as.numeric(score))) +
@@ -381,7 +360,6 @@ ggplot(data = dat %>% filter(season == 2023 & sex == "F") %>% mutate(score = as.
   xlab("week") +
   ggtitle("Females from the 2023-2024 breeding season in Kaikoura")
 ```
-
 
 ```{r, fig.height=6}
 ggplot(data = dat %>% filter(season == 2023 & sex == "M") %>% mutate(score = as.numeric(score))) +
@@ -404,7 +382,6 @@ ggplot(data = dat %>% filter(season == 2023 & sex == "M") %>% mutate(score = as.
 ```
 
 ### sex-specific differences in breeding plumage
-
 ```{r, include=FALSE}
 # extract the core breeding months (i.e., when presumably all birds are at their maximum breeding plumage), and determine the maximum score for each individual.
 ind_breeding_scores <- 
@@ -425,9 +402,6 @@ ind_breeding_scores %>%
 mod_max_score <- lmer(max_breeding_score ~ sex +
                         (1 | rings_comb) + (1 | season), 
                       data = ind_breeding_scores)
-
-summary(mod_max_score)
-plot(allEffects(mod_max_score))
 
 # Derive confidence intervals of effect sizes from parametric bootstrapping
 tidy_mod_max_score <-
@@ -471,9 +445,14 @@ stats_mod_max_score <-
        partR2m = R2m_mod_max_score,
        partR2c = R2c_mod_max_score,
        data = ind_breeding_scores)
+```
 
+```{r, include=FALSE}
 # saveRDS(stats_mod_max_score, file = "out/stats_mod_max_score.rds")
+stats_mod_max_score <- readRDS(file = "out/stats_mod_max_score.rds")
+```
 
+```{r, include=FALSE}
 #### Table of effect sizes ----
 # Retrieve sample sizes
 sample_sizes <-
@@ -578,10 +557,7 @@ allCoefs_mod <-
                     rep("Adjusted repeatability \U1D45F", nrow(coefRptTable)),
                     rep("Sample sizes \U1D45B", nrow(sample_sizes)))) %>%
   dplyr::select(effect, everything())
-```
 
-
-```{r}
 # density plot of sex-specific breeding plumage score distributions
 ind_breeding_scores %>% 
   group_by(rings_comb, sex) %>% 
@@ -635,14 +611,15 @@ mod_max_score_table <-
               column_labels.font.size = 14,
               row_group.font.size = 12,
               table.width = pct(80))
+```
 
+
+```{r, include=FALSE}
 mod_max_score_table
-
 plot(allEffects(mod_max_score))
 ```
 
 ### age- and sex-specific variation in breeding plumage (of known-aged birds)
-
 ```{r, include=FALSE}
 # extract the core breeding months (i.e., when presumably all birds are at their maximum breeding plumage), and determine the maximum score for each individual.
 ind_breeding_scores_age <- 
@@ -665,9 +642,6 @@ mod_max_score_age_sex <-
   lmer(max_breeding_score ~ sex + age + 
          (1 | rings_comb) + (1 | season), 
        data = ind_breeding_scores_age)
-
-summary(mod_max_score_age_sex)
-plot(allEffects(mod_max_score_age_sex))
 
 # Derive confidence intervals of effect sizes from parametric bootstrapping
 tidy_mod_max_score_age_sex <-
@@ -711,9 +685,14 @@ stats_mod_max_score_age_sex <-
        partR2m = R2m_mod_max_score_age_sex,
        partR2c = R2c_mod_max_score_age_sex,
        data = ind_breeding_scores_age)
+```
 
+```{r, include=FALSE}
 # saveRDS(stats_mod_max_score_age_sex, file = "out/stats_mod_max_score_age_sex.rds")
+stats_mod_max_score_age_sex <- readRDS(file = "out/stats_mod_max_score_age_sex.rds")
+```
 
+```{r, include=FALSE}
 #### Table of effect sizes ----
 # Retrieve sample sizes
 sample_sizes <-
@@ -820,9 +799,7 @@ allCoefs_mod <-
                     rep("Adjusted repeatability \U1D45F", nrow(coefRptTable)),
                     rep("Sample sizes \U1D45B", nrow(sample_sizes)))) %>%
   dplyr::select(effect, everything())
-```
 
-```{r}
 # draw gt table
 mod_max_score_age_sex_table <- 
   allCoefs_mod %>% 
@@ -853,12 +830,13 @@ mod_max_score_age_sex_table <-
               column_labels.font.size = 14,
               row_group.font.size = 12,
               table.width = pct(80))
+```
 
+```{r, include=FALSE}
 mod_max_score_age_sex_table
 
 plot(allEffects(mod_max_score_age_sex))
 ```
-
 
 ### migratory status- and sex-specific variation in breeding plumage (of known-status birds)
 
@@ -924,9 +902,6 @@ AIC(mod1, mod2, mod3, mod_full)
 
 # conclude that the term (1 | season) is not needed for statistical reasons, but also since we are not interested in population-level annual variation in the max-breeding plumage scores we can drop this
 
-summary(mod_max_score_status_sex)
-plot(allEffects(mod_max_score_status_sex))
-
 # Derive confidence intervals of effect sizes from parametric bootstrapping
 tidy_mod_max_score_status_sex <-
   tidy(mod_max_score_status_sex, conf.int = TRUE, conf.method = "boot", nsim = 1000)
@@ -969,9 +944,14 @@ stats_mod_max_score_status_sex <-
        partR2m = R2m_mod_max_score_status_sex,
        partR2c = R2c_mod_max_score_status_sex,
        data = ind_breeding_scores)
+```
 
+```{r, include=FALSE}
 # saveRDS(stats_mod_max_score_status_sex, file = "out/stats_mod_max_score_status_sex.rds")
+stats_mod_max_score_status_sex <- readRDS(file = "out/stats_mod_max_score_status_sex.rds")
+```
 
+```{r, include=FALSE}
 #### Table of effect sizes ----
 # Retrieve sample sizes
 sample_sizes <-
@@ -1078,7 +1058,6 @@ allCoefs_mod <-
   dplyr::select(effect, everything())
 ```
 
-
 ```{r}
 # draw gt table
 mod_max_score_table_status_sex <- 
@@ -1110,7 +1089,10 @@ mod_max_score_table_status_sex <-
               column_labels.font.size = 14,
               row_group.font.size = 12,
               table.width = pct(80))
+```
 
+
+```{r, include=FALSE}
 mod_max_score_table_status_sex
 
 plot(allEffects(mod_max_score_status_sex))
@@ -1147,7 +1129,7 @@ mod1 <-
   lme4::glmer(prop_molt_score ~ 
                 date_J * sex + std_max_breeding_score +
          # date_J * sex +
-         (1 | rings_comb) + (1|season),
+         (1 | rings_comb),
        data = ind_prop_molt_scores, 
        family = binomial,
        control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e+06)))
@@ -1226,7 +1208,7 @@ mod1_status <-
   lme4::glmer(prop_molt_score ~ 
                 date_J * migratory_status +
          # date_J * sex +
-         (1 | rings_comb) + (1 | season),
+         (1 | rings_comb),
        data = ind_prop_molt_scores, 
        family = binomial,
        control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e+06)))
@@ -1652,6 +1634,17 @@ summary(mod_max_score_breeding_date)
 
 plot(allEffects(mod_max_score_breeding_date), type = "response")
 
+# do individuals with a late breeding attempts have a fuller breeding plumage?
+mod_breeding_date_max_score <- 
+  lme4::lmer(max_breeding_score ~ 
+                 breeding_date_J +
+         (1 | rings_comb),
+       data = ind_prop_molt_scores_breeding_date)
+
+summary(mod_max_score_breeding_date)
+
+plot(allEffects(mod_breeding_date_max_score), type = "response")
+
 # do individuals with delayed moult breed later?
 mod_prop_molt_breeding_date <- 
   lme4::lmer(breeding_date_J ~ 
@@ -1662,6 +1655,17 @@ mod_prop_molt_breeding_date <-
 summary(mod_prop_molt_breeding_date)
 
 plot(allEffects(mod_prop_molt_breeding_date), type = "response")
+
+# do individuals with late breeding attempts have a delayed moult?
+mod_breeding_date_prop_molt <- 
+  lme4::lmer(prop_molt_score ~ 
+                 breeding_date_J +
+         (1 | rings_comb),
+       data = ind_prop_molt_scores_breeding_date)
+
+summary(mod_breeding_date_prop_molt)
+
+plot(allEffects(mod_breeding_date_prop_molt), type = "response")
 ```
 
 ### effect of age on extended breeding period
@@ -1677,8 +1681,7 @@ age_breeding_date <-
 
 # do older individuals conclude their breeding season later?
 mod_age_breeding_date <- 
-  lme4::lmer(breeding_date_J ~ 
-                 age +
+  lme4::lmer(breeding_date_J ~ age +
          (1 | rings_comb),
        data = age_breeding_date)
 
