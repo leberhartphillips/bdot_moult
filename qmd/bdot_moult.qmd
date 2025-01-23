@@ -2,7 +2,7 @@
 title: "Banded Dotterel Moult Study"
 subtitle: | 
   Exploration of dataset
-date: "`r format(Sys.time(), '%d %B, %Y')`"
+date: "`r format(Sys.time(), '%H:%M %d %B, %Y')`"
 author: 
  - name: Luke Eberhart-Hertel
    orcid: 0000-0001-7311-6088
@@ -14,6 +14,9 @@ author:
    affiliations:
      - ref: bk
  - name: Ailsa Howard
+   affiliations:
+     - ref: ah
+ - name: Ted Howard
    affiliations:
      - ref: ah
  - name: Tony Habraken
@@ -54,15 +57,15 @@ execute:
   cache: true
 editor_options: 
   chunk_output_type: console
+bibliography: references.bib
 ---
-```{r}
+```{r, include=FALSE}
 knitr::opts_chunk$set(cache = TRUE)
 ```
 
+```{r, message=FALSE, results='hide', warning=FALSE, cache=FALSE, include=FALSE}
 ## Prerequisites
 ### R packages
-```{r, message=FALSE, results='hide', warning=FALSE, results='hide', cache=FALSE, include=FALSE}
-
 # -   The following packages are needed for analysis and can be easily installed from [CRAN](http://cran.r-project.org/) or GitHub by running the following code chunk:
 
 # a vector of all the packages needed in the project
@@ -116,8 +119,8 @@ lapply(packages_required_in_project, require, character.only = TRUE)
 here::set_here()
 ```
 
-### Plotting themes
 ```{r, message=FALSE, results='hide', warning=FALSE, include=FALSE}
+### Plotting themes
 # -   The following plotting themes, colors, and typefaces are used throughout the project:
 
 # Find fonts from computer that you want. Use regular expressions to do this
@@ -129,11 +132,11 @@ extrafont::fonts()
 extrafont::fonttable()
 extrafont::loadfonts() # load these into R
 
-# Add Google font Lato
-font_add_google("Lato", "lato")
-
-# Automatically use showtext to render text
-showtext_auto()
+# # Add Google font Verdana
+# font_add_google("Lato", "Lato")
+# 
+# # Automatically use showtext to render text
+# showtext_auto()
 
 # define the plotting theme to be used in subsequent ggplots
 luke_theme <- 
@@ -156,8 +159,10 @@ luke_theme <-
   )
 ```
 
-## Visually explore the moult data extracted from photos
+## Exploration of moult data extracted from photos
+
 Note: data last modified 7-Nov-2024
+
 This dataset contains the scored moult data for all usable photos from the 2021-2022, 2022-2023, and 2023-2024 breeding seasons at Kaikoura
 
 ```{r, include = FALSE}
@@ -235,19 +240,26 @@ dat <-
                            ifelse(month(banding_date) < 7, year(banding_date) - 1, year(banding_date)),
                            NA),
     age = ifelse(age_at_banding == "P", as.numeric(season - season_ringed), NA))# i should find a better way to calculate age
+```
 
+check max and min dates for each season
+```{r, echo= FALSE}
 # check max and min dates for each season
 dat %>% 
   group_by(season) %>% 
   summarise(n_obs = n(),
             min_date = min(date),
             max_date = max(date))
+```
 
-# summarize the number of individuals in the dataset...94 unique combos
+summarize the number of individuals in the dataset
+```{r, echo = FALSE}
 dat %>%
   pull(rings_comb) %>% unique() %>% length()
+```
 
-# summarise the number of seasons for each individual...63 have more than one season of data
+assess how many individuals have more than a single seasons of data
+```{r, echo = FALSE}
 dat %>%
   select(rings_comb, season) %>% 
   distinct() %>% 
@@ -256,17 +268,33 @@ dat %>%
   arrange(desc(n_seasons)) %>% 
   filter(n_seasons > 1) %>%
   nrow()
+```
 
-# summarise the number of usable photos for each individual...
+summarise the number of usable photos for each individual across the three seasons
+```{r, echo = FALSE}
 dat %>%
   group_by(rings_comb, season) %>% 
   summarise(n_photos = n()) %>% 
-  arrange(desc(n_photos))
+  arrange(desc(n_photos)) %>% 
+  pivot_wider(., names_from = season, values_from = n_photos) %>% 
+  datatable(class = 'cell-border stripe', rownames = FALSE, filter = 'top')
+```
+
+the final dataset
+```{r, echo=TRUE}
+dat %>% 
+  datatable(class = 'cell-border stripe', rownames = FALSE, filter = 'top')
 ```
 
 ### Plot the sampling distribution of Ailsa's photos across the seasons
+
+The "score" value is based on a scale from 1 to 7 describing the immaculate-ness and full-ness of the rufous breast band seen in the photos (@kok2020experimental)
+
+# NOTE FOR BASHAR (23-01-2025): 
+`would be great to add a figure here showing example photos of an individual male and female over several phases of the moult. For example, two-columns with male on left, female on right, and 5 rows of images starting with their fullest and most immaculate state and ending with their basic plumage. Would be useful to show the scores you gave for these individuals in the figure`
+
 #### 2021-2022 season data
-```{r, fig.height=9}
+```{r, fig.height=9, echo=FALSE}
 # 2021-2022 season data
 ggplot(data = dat %>% filter(season == 2021 & sex == "F") %>% mutate(score = as.numeric(score), 
                                                                      rings_comb_ = reorder(rings_comb, n_photos, decreasing = TRUE))) +
@@ -288,7 +316,7 @@ ggplot(data = dat %>% filter(season == 2021 & sex == "F") %>% mutate(score = as.
   ggtitle("Females from the 2021-2022 breeding season in Kaikoura")
 ```
 
-```{r, fig.height=8}
+```{r, fig.height=8, echo=FALSE}
 ggplot(data = dat %>% filter(season == 2021 & sex == "M") %>% mutate(score = as.numeric(score))) +
   geom_point(aes(y = 1, x = date, fill = score), 
              pch = 21, color = "black", size = 3) +
@@ -309,7 +337,7 @@ ggplot(data = dat %>% filter(season == 2021 & sex == "M") %>% mutate(score = as.
 ```
 
 #### 2022-2023 season data
-```{r, fig.height=10}
+```{r, fig.height=10, echo=FALSE}
 # 2022-2023 season data (not as good coverage as the previous season)
 ggplot(data = dat %>% filter(season == 2022 & sex == "F") %>% mutate(score = as.numeric(score))) +
   geom_point(aes(y = 1, x = date, fill = score), 
@@ -330,7 +358,7 @@ ggplot(data = dat %>% filter(season == 2022 & sex == "F") %>% mutate(score = as.
   ggtitle("Females from the 2022-2023 breeding season in Kaikoura")
 ```
 
-```{r, fig.height=7}
+```{r, fig.height=7, echo=FALSE}
 ggplot(data = dat %>% filter(season == 2022 & sex == "M") %>% mutate(score = as.numeric(score))) +
   geom_point(aes(y = 1, x = date, fill = score), 
              pch = 21, color = "black", size = 3) +
@@ -351,7 +379,7 @@ ggplot(data = dat %>% filter(season == 2022 & sex == "M") %>% mutate(score = as.
 ```
 
 #### 2023-2024 season data
-```{r, fig.height=10}
+```{r, fig.height=10, echo=FALSE}
 # 2023-2024 season data 
 ggplot(data = dat %>% filter(season == 2023 & sex == "F") %>% mutate(score = as.numeric(score))) +
   geom_point(aes(y = 1, x = date, fill = score), 
@@ -372,7 +400,7 @@ ggplot(data = dat %>% filter(season == 2023 & sex == "F") %>% mutate(score = as.
   ggtitle("Females from the 2023-2024 breeding season in Kaikoura")
 ```
 
-```{r, fig.height=6}
+```{r, fig.height=6, echo=FALSE}
 ggplot(data = dat %>% filter(season == 2023 & sex == "M") %>% mutate(score = as.numeric(score))) +
   geom_point(aes(y = 1, x = date, fill = score), 
              pch = 21, color = "black", size = 3) +
@@ -392,9 +420,10 @@ ggplot(data = dat %>% filter(season == 2023 & sex == "M") %>% mutate(score = as.
   ggtitle("Males from the 2023-2024 breeding season in Kaikoura")
 ```
 
-## Statistical analysis of moult dynamics
+## Sources of individual variation in the maximum score of the rufous band
 ### Sex-specific differences in breeding plumage
-```{r, include=FALSE}
+data wrangle for sex model
+```{r}
 # extract the core breeding months (i.e., when presumably all birds are at their maximum breeding plumage), and determine the maximum score for each individual.
 ind_breeding_scores <- 
   dat %>% 
@@ -404,23 +433,30 @@ ind_breeding_scores <-
   group_by(season, rings_comb, sex) %>% 
   summarise(max_breeding_score = max(score)) %>% 
   ungroup()
+```
 
-# Assess sample sizes of each sex (49 females, 35 males)
+Assess sample sizes of each sex
+```{r, echo=FALSE}
 ind_breeding_scores %>% 
   group_by(sex) %>% 
   summarise(n_distinct(rings_comb))
+```
 
+mixed model with individual and season as random intercepts and sex as fixed effect
+```{r, fold-show}
 # linear mixed model for the difference in max score between sexes
 mod_max_score <- lmer(max_breeding_score ~ sex +
                         (1 | rings_comb) + (1 | season), 
                       data = ind_breeding_scores)
+```
+
+```{r, eval=FALSE, include=FALSE}
+tbl_regression(mod_max_score, intercept = TRUE, 
+               label = list(sex ~ "Sex"))
 
 # Derive confidence intervals of effect sizes from parametric bootstrapping
 tidy_mod_max_score <-
   tidy(mod_max_score, conf.int = TRUE, conf.method = "boot", nsim = 1000)
-
-tbl_regression(mod_max_score, intercept = TRUE, 
-               label = list(sex ~ "Sex"))
 
 # run rptR to obtain repeatabilities of random effects
 rpt_mod_max_score <-
@@ -599,11 +635,13 @@ mod_max_score_table <-
               summary_row.padding = 2,
               column_labels.font.size = 14,
               row_group.font.size = 12,
-              table.width = pct(80))
+              table.width = pct(100))
 ```
 
+Males tend to have a more full and immaculate rufous bands than females, however there is substantial overlap in their distributions.
+
 #### sex-specific breeding plumage distributions
-```{r}
+```{r, echo=FALSE, fig.width=6, fig.align='center'}
 ind_breeding_scores %>% 
   group_by(rings_comb, sex) %>% 
   summarise(max_breeding_score = max(max_breeding_score)) %>% 
@@ -615,33 +653,49 @@ ind_breeding_scores %>%
   ggplot() +
   geom_bar(aes(x = max_breeding_score, y = n, fill = sex), 
            alpha = 0.5, stat = "identity", position = "dodge", width = 0.5) +
-  luke_theme +
-  theme(legend.position = c(0.15, 0.9)) +
+  theme(text = element_text(family = "Verdana"),
+        legend.title = element_blank(),
+        axis.ticks = element_blank(),
+        axis.text = element_text(size = 10, colour = "grey40"),
+        axis.title.y = element_text(size = 11, colour = "grey40"),
+        axis.text.y = element_text(size = 10, colour = "grey40"),
+        plot.margin = unit(c(0.2,0.2,0.2,0.2), "cm"),
+        panel.spacing = unit(1, "cm"),
+        panel.background = element_rect(fill = 'transparent', color = NA),
+        plot.background = element_rect(fill = 'transparent', color = NA), 
+        strip.background = element_rect(fill = 'grey90', color = NA),
+        strip.text = element_text(size = 13, colour = "grey40"),
+        panel.grid.major.y = element_line(size = 0.25, lineend = "round", colour = "grey90"),
+        panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank(),
+        axis.title.x = element_blank()) +
+  theme(legend.position = c(0.15, 0.8)) +
   xlab("Maximum individual rufous band score during breeding season") +
   ylab("Frequency") +
   scale_colour_brewer(palette = "Dark2", direction = -1,
-                      name = "Sex",
+                      name = "sex",
                       labels = c("Female (N = 49)", "Male (N = 35)")) +
   scale_fill_brewer(palette = "Dark2", direction = -1,
-                    name = "Sex",
+                    name = "sex",
                     labels = c("Female (N = 49)", "Male (N = 35)"))
 ```
 
-#### effect-size table for sex-specific breeding plumage
-Males tend to have a more full and immaculate rufous bands than females
-```{r, include=FALSE}
+#### effect-size table for sex-specific breeding plumage model
+```{r, echo=FALSE}
 mod_max_score_table
 ```
 
-```{r, eval=FALSE}
+```{r, include=FALSE}
 effects_mod_max_score <- 
   as.data.frame(allEffects(mod_max_score)$sex) %>%
   mutate(x_mean = ifelse(sex == "F", as.numeric(factor(sex)) + 0.2,
                          ifelse(sex == "M", as.numeric(factor(sex)) - 0.2, NA)),
          x_data = ifelse(sex == "F", as.numeric(factor(sex)), 
                           ifelse(sex == "M", as.numeric(factor(sex)), NA)))
+```
 
-
+#### sex-specific breeding plumage model predictions 
+```{r, echo=FALSE, fig.width=4, fig.align='center'}
 ggplot() +
   geom_errorbar(data = effects_mod_max_score, 
                 aes(x = x_mean, ymin = lower, ymax = upper), width = 0.05) +
@@ -652,7 +706,7 @@ ggplot() +
                  y = max_breeding_score, fill = sex), 
              width = 0.05, height = 0.1, shape = 21, size = 3, alpha = 0.75) +
   theme(legend.position = "none",
-        text = element_text(family = "lato"),
+        text = element_text(family = "Verdana"),
         axis.ticks = element_blank(),
         axis.text = element_text(size = 10, colour = "grey40"),
         axis.title.y = element_text(size = 11, colour = "grey40"),
@@ -670,13 +724,14 @@ ggplot() +
   scale_x_continuous(limits = c(0.8, 2.2), 
                      breaks = c(1.1, 1.9), 
                      labels = c("female", "male")) +
-  ylab("maximum breeding plumage score observed") +
+  ylab("maximum breeding plumage score observed\n(mean ± 95% CI") +
   scale_fill_brewer(palette = "Set2") +
   scale_y_continuous(limits = c(3.8, 7.2))
 ```
 
 ### Age- and sex-specific variation in breeding plumage (of known-aged birds)
-```{r, include=FALSE}
+data wrangle for sex-age model. Standardize max_breeding_score according to sex to make males and females to make them comparable across ages (i.e., does max_breeding_score change across age while accounting for underlying sex differences?)
+```{r}
 # extract the core breeding months (i.e., when presumably all birds are at their maximum breeding plumage), and determine the maximum score for each individual.
 ind_breeding_scores_age <- 
   dat %>% 
@@ -685,32 +740,43 @@ ind_breeding_scores_age <-
   filter(breeding_season == 1) %>% 
   group_by(season, rings_comb, sex, age) %>% 
   summarise(max_breeding_score = max(score)) %>% 
-  ungroup() %>% 
+  ungroup() %>%
+  group_by(sex) %>% 
+  mutate(std_max_breeding_score = (max_breeding_score - mean(max_breeding_score, na.rm = TRUE)) / sd(max_breeding_score, na.rm = TRUE)) %>%
   filter(!is.na(age))
+```
 
-# Assess sample sizes of each sex and season (14 females, 10 males)
+Assess sample sizes of each sex for individuals with known age
+```{r}
 ind_breeding_scores_age %>% 
   group_by(sex) %>% 
   summarise(n_distinct(rings_comb))
+```
 
+mixed model of standardized max breeding score (by sex) with individual as random intercept and age as fixed effect (Note: we tried to include season as an additional random intercept, but the low sample size of repeated measures across seasons caused convergence issues of the model)
+```{r}
 # linear mixed model for the difference in max score between sexes across age
-mod_max_score_age_sex <- 
-  lmer(max_breeding_score ~ sex + age + 
-         (1 | rings_comb) + (1 | season), 
+mod_max_score_age <- 
+  lmer(std_max_breeding_score ~ age +
+         (1 | rings_comb), 
        data = ind_breeding_scores_age)
+```
+
+```{r, eval=FALSE, include=FALSE}
+# quick look at effect
+plot(allEffects(mod_max_score_age), type = "response")
+tbl_regression(mod_max_score_age, intercept = TRUE, 
+               label = list(age ~ "Age"))
 
 # Derive confidence intervals of effect sizes from parametric bootstrapping
-tidy_mod_max_score_age_sex <-
-  tidy(mod_max_score_age_sex, conf.int = TRUE, conf.method = "boot", nsim = 1000)
-
-tbl_regression(mod_max_score_age_sex, intercept = TRUE, 
-               label = list(sex ~ "Sex", age ~ "Age"))
+tidy_mod_max_score_age <-
+  tidy(mod_max_score_age, conf.int = TRUE, conf.method = "boot", nsim = 1000)
 
 # run rptR to obtain repeatabilities of random effects
-rpt_mod_max_score_age_sex <-
-  rpt(max_breeding_score ~ sex + age +
-         (1 | rings_comb) + (1 | season),
-      grname = c("rings_comb", "season", "Fixed"),
+rpt_mod_max_score_age <-
+  rpt(std_max_breeding_score ~ age +
+         (1 | rings_comb),
+      grname = c("rings_comb", "Fixed"),
       data = ind_breeding_scores_age,
       datatype = "Gaussian",
       nboot = 1000, npermut = 1000, ratio = TRUE,
@@ -718,34 +784,34 @@ rpt_mod_max_score_age_sex <-
 
 # run partR2 on each model to obtain marginal R2, parameter estimates, and beta
 # weights
-R2m_mod_max_score_age_sex <-
-  partR2(mod_max_score_age_sex,
-         partvars = c("sex", "age"),
+R2m_mod_max_score_age <-
+  partR2(mod_max_score_age,
+         partvars = c("age"),
          R2_type = "marginal",
          nboot = 1000,
          CI = 0.95,
          max_level = 1)
 
-R2c_mod_max_score_age_sex <-
-  partR2(mod_max_score_age_sex,
-         partvars = c("sex", "age"),
+R2c_mod_max_score_age <-
+  partR2(mod_max_score_age,
+         partvars = c("age"),
          R2_type = "conditional",
          nboot = 1000,
          CI = 0.95,
          max_level = 1)
 
-stats_mod_max_score_age_sex <-
-  list(mod = mod_max_score_age_sex,
-       tidy = tidy_mod_max_score_age_sex,
-       rptR = rpt_mod_max_score_age_sex,
-       partR2m = R2m_mod_max_score_age_sex,
-       partR2c = R2c_mod_max_score_age_sex,
+stats_mod_max_score_age <-
+  list(mod = mod_max_score_age,
+       tidy = tidy_mod_max_score_age,
+       rptR = rpt_mod_max_score_age,
+       partR2m = R2m_mod_max_score_age,
+       partR2c = R2c_mod_max_score_age,
        data = ind_breeding_scores_age)
 ```
 
 ```{r, include=FALSE}
-# saveRDS(stats_mod_max_score_age_sex, file = "out/stats_mod_max_score_age_sex.rds")
-stats_mod_max_score_age_sex <- readRDS(file = "/Users/luketheduke2/ownCloud/kemp_projects/bdot/moult/out/stats_mod_max_score_age_sex.rds")
+# saveRDS(stats_mod_max_score_age, file = "out/stats_mod_max_score_age.rds")
+stats_mod_max_score_age <- readRDS(file = "/Users/luketheduke2/ownCloud/kemp_projects/bdot/moult/out/stats_mod_max_score_age.rds")
 ```
 
 ```{r, include=FALSE}
@@ -766,17 +832,13 @@ sample_sizes <-
 
 # clean model component names
 mod_comp_names <- 
-  data.frame(comp_name = c("Male (Sex)",
-                           "Age",
+  data.frame(comp_name = c("Age",
                            "Total Marginal \U1D479\U00B2",
-                           "Sex",
                            "Age",
                            "Total Conditional \U1D479\U00B2",
                            "Individual",
-                           "Year",
                            "Residual",
                            "Individual",
-                           "Year",
                            "Residual",
                            "Years",
                            "Individuals",
@@ -784,7 +846,7 @@ mod_comp_names <-
 
 # Fixed effect sizes (non-standardized)
 fixefTable <- 
-  stats_mod_max_score_age_sex$tidy %>% 
+  stats_mod_max_score_age$tidy %>% 
   dplyr::filter(effect == "fixed") %>% 
   dplyr::select(term, estimate, conf.low, conf.high) %>% 
   as.data.frame() %>% 
@@ -792,7 +854,7 @@ fixefTable <-
 
 # Fixed effect sizes (standardized)
 fixef_bw_Table <- 
-  stats_mod_max_score_age_sex$partR2m$BW %>% 
+  stats_mod_max_score_age$partR2m$BW %>% 
   as.data.frame() %>% 
   mutate(stat = "fixed_bw") %>% 
   rename(conf.low = CI_lower,
@@ -800,8 +862,8 @@ fixef_bw_Table <-
 
 # Semi-partial R2 estimates
 R2Table <- 
-  bind_rows(stats_mod_max_score_age_sex$partR2m$R2,
-            stats_mod_max_score_age_sex$partR2c$R2[1,]) %>% 
+  bind_rows(stats_mod_max_score_age$partR2m$R2,
+            stats_mod_max_score_age$partR2c$R2[1,]) %>% 
   dplyr::select(term, estimate, CI_lower, CI_upper) %>% 
   as.data.frame() %>% 
   mutate(stat = "partR2") %>% 
@@ -810,7 +872,7 @@ R2Table <-
 
 # Random effects variances
 ranefTable <- 
-  stats_mod_max_score_age_sex$tidy %>% 
+  stats_mod_max_score_age$tidy %>% 
   dplyr::filter(effect == "ran_pars") %>% 
   dplyr::select(group, estimate, conf.low, conf.high) %>% 
   as.data.frame() %>% 
@@ -822,7 +884,7 @@ ranefTable <-
 
 # Adjusted repeatabilities
 coefRptTable <- 
-  stats_mod_max_score_age_sex$rptR$R_boot %>% 
+  stats_mod_max_score_age$rptR$R_boot %>% 
   dplyr::select(-Fixed) %>% 
   mutate(residual = 1 - rowSums(.)) %>% 
   apply(., 2, 
@@ -857,7 +919,7 @@ allCoefs_mod <-
   dplyr::select(effect, everything())
 
 # draw gt table
-mod_max_score_age_sex_table <- 
+mod_max_score_age_table <- 
   allCoefs_mod %>% 
   dplyr::select(effect, comp_name, estimate, coefString) %>% 
   gt(rowname_col = "row",
@@ -866,11 +928,11 @@ mod_max_score_age_sex_table <-
              estimate = "Mean estimate",
              coefString = "95% confidence interval") %>% 
   fmt_number(columns = c(estimate),
-             rows = 1:12,
+             rows = 1:10,
              decimals = 2,
              use_seps = FALSE) %>% 
   fmt_number(columns = c(estimate),
-             rows = 11:15,
+             rows = 9:11,
              decimals = 0,
              use_seps = FALSE) %>% 
   sub_missing(columns = 1:4,
@@ -885,35 +947,36 @@ mod_max_score_age_sex_table <-
               summary_row.padding = 2,
               column_labels.font.size = 14,
               row_group.font.size = 12,
-              table.width = pct(80))
+              table.width = pct(100))
 ```
 
 #### effect-size table for sex- and age-specific variation in breeding plumage
 no effect of age on the maximum extent of an individual's rufous band score while controlling for underlying sex-specific variation
-```{r, include=FALSE}
-mod_max_score_age_sex_table
+```{r, echo=FALSE}
+mod_max_score_age_table
 ```
 
-
-```{r, include=FALSE}
+#### age-specific breeding plumage model predictions
+```{r, echo=FALSE}
 # extract predicted trends
-pr <- ggeffects::predict_response(mod_max_score_age_sex)
+pr <- ggeffects::predict_response(mod_max_score_age)
 
 # join the back-transformed dates to model fits
-mod_max_score_age_sex_fits <- 
+mod_max_score_age_fits <- 
   as.data.frame(pr)
 
 ggplot() +
-  geom_ribbon(data = mod_max_score_age_sex_fits, 
-                aes(x = age.x, ymin = age.conf.low, ymax = age.conf.high), fill = "steelblue", alpha = 0.5) +
-  geom_line(data = mod_max_score_age_sex_fits, 
-             aes(x = age.x, y = age.predicted), color = "steelblue") +
+  geom_ribbon(data = mod_max_score_age_fits, 
+                aes(x = age.x, ymin = age.conf.low, ymax = age.conf.high), fill = "grey70", alpha = 0.5) +
+  geom_line(data = mod_max_score_age_fits, 
+             aes(x = age.x, y = age.predicted), color = "grey40") +
   geom_jitter(data = ind_breeding_scores_age,
              aes(x = age, 
-                 y = max_breeding_score), 
-             width = 0.05, height = 0.1, shape = 21, size = 3, alpha = 0.75, fill = "steelblue", alpha = 1) +
-  theme(legend.position = "none",
-        text = element_text(family = "lato"),
+                 y = std_max_breeding_score, fill = sex), 
+             width = 0.05, height = 0.1, shape = 21, size = 3, alpha = 0.75, alpha = 1) +
+  theme(legend.position = c(0.15, 0.2),
+        legend.title = element_blank(),
+        text = element_text(family = "Verdana"),
         axis.ticks = element_blank(),
         axis.text = element_text(size = 10, colour = "grey40"),
         axis.title.y = element_text(size = 11, colour = "grey40"),
@@ -927,14 +990,16 @@ ggplot() +
         panel.grid.major = element_line(size = 0.25, lineend = "round", colour = "grey90"),
         panel.grid.minor = element_blank()) +
   scale_x_continuous(limits = c(0.5, 6.5), breaks = c(1:6), labels = c(1:6)) +
-  ylab("maximum breeding plumage score observed") +
+  ylab("sex-standardized\nmaximum breeding plumage score observed") +
   xlab("age") +
-  scale_fill_brewer(palette = "Set2") +
-  scale_y_continuous(limits = c(3.8, 7.2))
+  scale_fill_brewer(palette = "Dark2", direction = -1,
+                    name = "sex",
+                    labels = c("Female (N = 14)", "Male (N = 10)"))
 ```
 
 ### Migratory status- and sex-specific variation in breeding plumage (of known-status birds)
-```{r, include=FALSE}
+data wrangle for sex-migratory status model
+```{r}
 # extract the core breeding months (i.e., when presumably all birds are at their maximum breeding plumage), and determine the maximum score for each individual.
 ind_breeding_scores_status <- 
   dat %>% 
@@ -943,46 +1008,57 @@ ind_breeding_scores_status <-
   filter(breeding_season == 1) %>% 
   group_by(season, rings_comb, sex, age, migratory_status) %>% 
   summarise(max_breeding_score = max(score)) %>% 
-  ungroup() %>% 
+  ungroup() %>%
+  group_by(sex) %>% 
+  mutate(std_max_breeding_score = (max_breeding_score - mean(max_breeding_score, na.rm = TRUE)) / sd(max_breeding_score, na.rm = TRUE)) %>% 
   filter(migratory_status %in% c("M", "R"))
+```
 
+Assess sample sizes of each sex and migratory status (for birds with known status)
+```{r, echo=TRUE}
 # Assess sample sizes of each sex and season 
 # (13 females (2 migrant, 11 resident), 8 males (3 migrant, 5 resident))
 ind_breeding_scores_status %>% 
   group_by(sex, migratory_status) %>% 
   summarise(n_distinct(rings_comb))
+```
 
+mixed model of standardized max breeding score (by sex) with individual as random intercept and migratory status as fixed effect (Note: we tried to include season as an additional random intercept, but the low sample size of repeated measures across seasons caused convergence issues of the model)
+```{r}
 # linear mixed model for the difference in max score between sexes
-mod_max_score_status_sex <- 
-  lmer(max_breeding_score ~ sex + migratory_status + 
+mod_max_score_status <- 
+  lmer(std_max_breeding_score ~ migratory_status + 
          (1 | rings_comb), 
        data = ind_breeding_scores_status)
+```
 
+```{r, eval=FALSE, include=FALSE}
 # # detected singularity issue in a model with (1 | season), summary showed 
 # that variance component of this random effect was zero. 
 
 # # Model with one random effect
 mod1 <- 
-  lmer(max_breeding_score ~ 
-         sex + migratory_status + season + 
+  lmer(std_max_breeding_score ~ 
+         migratory_status + season + 
          (1 | rings_comb), 
        data = ind_breeding_scores_status)
 
 mod2 <- 
-  lmer(max_breeding_score ~ 
-         sex + migratory_status + 
+  lmer(std_max_breeding_score ~ 
+         migratory_status + 
          (1 | season), 
        data = ind_breeding_scores_status)
 
 mod3 <- 
-  lmer(max_breeding_score ~ 
-         sex + migratory_status +
+  lmer(std_max_breeding_score ~ 
+         migratory_status +
          (1 | rings_comb), 
        data = ind_breeding_scores_status)
 
 # Compare with the full model
 mod_full <- 
-  lmer(max_breeding_score ~ sex + migratory_status + 
+  lmer(std_max_breeding_score ~ 
+         migratory_status + 
          (1 | rings_comb) + (1 | season), 
        data = ind_breeding_scores_status)
 
@@ -996,17 +1072,21 @@ summary(mod_full)
 AIC(mod1, mod2, mod3, mod_full)
 
 # conclude that the term (1 | season) is not needed for statistical reasons, but also since we are not interested in population-level annual variation in the max-breeding plumage scores we can drop this
+```
+
+```{r, eval=FALSE, include=FALSE}
+# quick look at effect
+plot(allEffects(mod_max_score_status), type = "response")
+tbl_regression(mod_max_score_status, intercept = TRUE, 
+               label = list(migratory_status ~ "migratory status"))
 
 # Derive confidence intervals of effect sizes from parametric bootstrapping
-tidy_mod_max_score_status_sex <-
-  tidy(mod_max_score_status_sex, conf.int = TRUE, conf.method = "boot", nsim = 1000)
-
-tbl_regression(mod_max_score_status_sex, intercept = TRUE, 
-               label = list(sex ~ "Sex", migratory_status ~ "Status"))
+tidy_mod_max_score_status <-
+  tidy(mod_max_score_status, conf.int = TRUE, conf.method = "boot", nsim = 1000)
 
 # run rptR to obtain repeatabilities of random effects
-rpt_mod_max_score_status_sex <-
-  rpt(max_breeding_score ~ sex + migratory_status +
+rpt_mod_max_score_status <-
+  rpt(std_max_breeding_score ~ migratory_status +
          (1 | rings_comb),
       grname = c("rings_comb", "Fixed"),
       data = ind_breeding_scores_status,
@@ -1016,37 +1096,37 @@ rpt_mod_max_score_status_sex <-
 
 # run partR2 on each model to obtain marginal R2, parameter estimates, and beta
 # weights
-R2m_mod_max_score_status_sex <-
-  partR2(mod_max_score_status_sex,
-         partvars = c("sex", "migratory_status"),
+R2m_mod_max_score_status <-
+  partR2(mod_max_score_status,
+         partvars = c("migratory_status"),
          R2_type = "marginal",
          nboot = 1000,
          CI = 0.95,
          max_level = 1)
 
-R2c_mod_max_score_status_sex <-
-  partR2(mod_max_score_status_sex,
-         partvars = c("sex", "migratory_status"),
+R2c_mod_max_score_status <-
+  partR2(mod_max_score_status,
+         partvars = c("migratory_status"),
          R2_type = "conditional",
          nboot = 1000,
          CI = 0.95,
          max_level = 1)
 
-stats_mod_max_score_status_sex <-
-  list(mod = mod_max_score_status_sex,
-       tidy = tidy_mod_max_score_status_sex,
-       rptR = rpt_mod_max_score_status_sex,
-       partR2m = R2m_mod_max_score_status_sex,
-       partR2c = R2c_mod_max_score_status_sex,
-       data = ind_breeding_scores)
+stats_mod_max_score_status <-
+  list(mod = mod_max_score_status,
+       tidy = tidy_mod_max_score_status,
+       rptR = rpt_mod_max_score_status,
+       partR2m = R2m_mod_max_score_status,
+       partR2c = R2c_mod_max_score_status,
+       data = ind_breeding_scores_status)
 ```
 
 ```{r, include=FALSE}
-# saveRDS(stats_mod_max_score_status_sex, file = "out/stats_mod_max_score_status_sex.rds")
-stats_mod_max_score_status_sex <- readRDS(file = "/Users/luketheduke2/ownCloud/kemp_projects/bdot/moult/out/stats_mod_max_score_status_sex.rds")
+# saveRDS(stats_mod_max_score_status, file = "out/stats_mod_max_score_status.rds")
+stats_mod_max_score_status <- readRDS(file = "/Users/luketheduke2/ownCloud/kemp_projects/bdot/moult/out/stats_mod_max_score_status.rds")
 ```
 
-```{r, include=FALSE}
+```{r, echo=FALSE}
 #### Table of effect sizes ----
 # Retrieve sample sizes
 sample_sizes <-
@@ -1064,10 +1144,8 @@ sample_sizes <-
 
 # clean model component names
 mod_comp_names <- 
-  data.frame(comp_name = c("Male (Sex)",
-                           "Resident (Migratory Status)",
+  data.frame(comp_name = c("Resident (Migratory Status)",
                            "Total Marginal \U1D479\U00B2",
-                           "Sex",
                            "Migratory Status",
                            "Total Conditional \U1D479\U00B2",
                            "Individual",
@@ -1080,7 +1158,7 @@ mod_comp_names <-
 
 # Fixed effect sizes (non-standardized)
 fixefTable <- 
-  stats_mod_max_score_status_sex$tidy %>% 
+  stats_mod_max_score_status$tidy %>% 
   dplyr::filter(effect == "fixed") %>% 
   dplyr::select(term, estimate, conf.low, conf.high) %>% 
   as.data.frame() %>% 
@@ -1088,7 +1166,7 @@ fixefTable <-
 
 # Fixed effect sizes (standardized)
 fixef_bw_Table <- 
-  stats_mod_max_score_status_sex$partR2m$BW %>% 
+  stats_mod_max_score_status$partR2m$BW %>% 
   as.data.frame() %>% 
   mutate(stat = "fixed_bw") %>% 
   rename(conf.low = CI_lower,
@@ -1096,8 +1174,8 @@ fixef_bw_Table <-
 
 # Semi-partial R2 estimates
 R2Table <- 
-  bind_rows(stats_mod_max_score_status_sex$partR2m$R2,
-            stats_mod_max_score_status_sex$partR2c$R2[1,]) %>% 
+  bind_rows(stats_mod_max_score_status$partR2m$R2,
+            stats_mod_max_score_status$partR2c$R2[1,]) %>% 
   dplyr::select(term, estimate, CI_lower, CI_upper) %>% 
   as.data.frame() %>% 
   mutate(stat = "partR2") %>% 
@@ -1106,7 +1184,7 @@ R2Table <-
 
 # Random effects variances
 ranefTable <- 
-  stats_mod_max_score_status_sex$tidy %>% 
+  stats_mod_max_score_status$tidy %>% 
   dplyr::filter(effect == "ran_pars") %>% 
   dplyr::select(group, estimate, conf.low, conf.high) %>% 
   as.data.frame() %>% 
@@ -1118,7 +1196,7 @@ ranefTable <-
 
 # Adjusted repeatabilities
 coefRptTable <- 
-  stats_mod_max_score_status_sex$rptR$R_boot %>% 
+  stats_mod_max_score_status$rptR$R_boot %>% 
   dplyr::select(-Fixed) %>% 
   mutate(residual = 1 - rowSums(.)) %>% 
   apply(., 2, 
@@ -1151,16 +1229,650 @@ allCoefs_mod <-
                     rep("Adjusted repeatability \U1D45F", nrow(coefRptTable)),
                     rep("Sample sizes \U1D45B", nrow(sample_sizes)))) %>%
   dplyr::select(effect, everything())
-```
 
-```{r}
-# draw gt table
-mod_max_score_table_status_sex <- 
+mod_max_score_table_status <- 
   allCoefs_mod %>% 
   dplyr::select(effect, comp_name, estimate, coefString) %>% 
   gt(rowname_col = "row",
      groupname_col = "effect") %>% 
   cols_label(comp_name = html("<i>Banded Dotterel rufous band score</i>"),
+             estimate = "Mean estimate",
+             coefString = "95% confidence interval") %>% 
+  fmt_number(columns = c(estimate),
+             rows = 1:8,
+             decimals = 2,
+             use_seps = FALSE) %>% 
+  fmt_number(columns = c(estimate),
+             rows = 9:11,
+             decimals = 0,
+             use_seps = FALSE) %>% 
+  sub_missing(columns = 1:4,
+              missing_text = "") %>% 
+  cols_align(align = "left",
+             columns = c(comp_name)) %>% 
+  tab_options(row_group.font.weight = "bold",
+              row_group.background.color = brewer.pal(9,"Greys")[3],
+              table.font.size = 12,
+              data_row.padding = 3,
+              row_group.padding = 4,
+              summary_row.padding = 2,
+              column_labels.font.size = 14,
+              row_group.font.size = 12,
+              table.width = pct(80))
+```
+
+#### effect-size table and plot for sex- and migratory-status breeding plumage
+no effect of migratory status on an individual's rufous band score while controlling for underlying sex-specific variation
+```{r, echo=FALSE}
+mod_max_score_table_status
+```
+
+#### migratory status-specific breeding plumage model predictions 
+```{r, echo=FALSE, fig.width=6, fig.align='center'}
+effects_mod_max_score_status2 <- 
+  as.data.frame(allEffects(mod_max_score_status)$migratory_status) %>%
+  mutate(x_mean = ifelse(migratory_status == "M", as.numeric(factor(migratory_status)) + 0.2,
+                         ifelse(migratory_status == "R", as.numeric(factor(migratory_status)) - 0.2, NA)),
+         x_data = ifelse(migratory_status == "M", as.numeric(factor(migratory_status)), 
+                          ifelse(migratory_status == "R", as.numeric(factor(migratory_status)), NA)))
+
+ggplot() +
+  geom_errorbar(data = effects_mod_max_score_status2, 
+                aes(x = x_mean, ymin = lower, ymax = upper), width = 0.05) +
+  geom_point(data = effects_mod_max_score_status2, 
+             aes(x = x_mean, y = fit, fill = migratory_status), shape = 21, size = 5) +
+  geom_jitter(data = ind_breeding_scores_status,
+             aes(x = as.numeric(factor(migratory_status)), 
+                 y = std_max_breeding_score, fill = migratory_status), 
+             width = 0.05, height = 0.1, shape = 21, size = 3, alpha = 0.75) +
+  theme(legend.position = "none",
+        text = element_text(family = "Verdana"),
+        axis.ticks = element_blank(),
+        axis.text = element_text(size = 10, colour = "grey40"),
+        axis.title.y = element_text(size = 11, colour = "grey40"),
+        plot.margin = unit(c(0.2,0.2,0.2,0.2), "cm"),
+        panel.spacing = unit(1, "cm"),
+        panel.background = element_rect(fill = 'transparent', color = NA),
+        plot.background = element_rect(fill = 'transparent', color = NA), 
+        panel.grid.major.y = element_line(size = 0.25, lineend = "round", colour = "grey90"),
+        panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank(),
+        axis.title.x = element_blank()) +
+  scale_x_continuous(limits = c(0.8, 2.2), 
+                     breaks = c(1.1, 1.9), 
+                     labels = c("migrant", "resident"))  +
+  ylab("sex-standardized\nmaximum breeding plumage score observed") +
+  scale_fill_brewer(palette = "Set1")
+```
+
+## Sources of individual variation in the timing of pre-basic moult
+### Within-individual moult dynamics across sexes
+wrangle data by calculating the individual proportional moult scores by comparing each score to a given individual's max (determined in previous chunk). Piece apart sex-specific variation in the timing of pre-basic moult while accounting for sex differences in maximum rufous band score
+```{r}
+ind_prop_molt_scores <- 
+  dat %>% 
+  mutate(score = as.numeric(score)) %>% 
+  left_join(., select(ind_breeding_scores, -sex), by = c("rings_comb","season")) %>% 
+  filter(!is.na(max_breeding_score)) %>%
+  group_by(sex) %>%
+  mutate(std_max_breeding_score = 
+           (max_breeding_score - mean(max_breeding_score, na.rm = TRUE)) / sd(max_breeding_score, na.rm = TRUE)) %>% 
+  # focus on key months of moult (Nov, Dec, Jan, Feb, March) 
+  filter(month(date) %in% c(11, 12, 1, 2, 3)) %>% 
+  # subtract 1 to make minimum score 0
+  mutate(prop_molt_score = (score-1)/(max_breeding_score-1)) %>%
+  select(rings_comb, season, date_J, sex, score, max_breeding_score, std_max_breeding_score, prop_molt_score) %>% 
+  arrange(rings_comb, season, date_J) %>% 
+  distinct() %>% 
+  filter(!is.na(prop_molt_score)) %>%
+  ungroup()
+```
+
+Assess sample sizes of each sex
+```{r, echo=FALSE}
+ind_prop_molt_scores %>% 
+  group_by(sex) %>% 
+  summarise(n_distinct(rings_comb))
+```
+
+mixed effects binomial model assessing an interaction between sex and date on changes in moult scores while controlling for between sex differences in the maximum breeding score
+```{r, warning=FALSE}
+mod_moult_sex <- 
+  lme4::glmer(prop_molt_score ~ 
+                date_J * sex +
+         (1 | rings_comb) + (1 | season),
+       data = ind_prop_molt_scores, 
+       family = binomial,
+       control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e+06)))
+```
+
+```{r, warning=FALSE}
+mod_moult_sex_season_RIS <- 
+  lme4::glmer(prop_molt_score ~ 
+                date_J + sex + 
+         (date_J | season),
+       data = ind_prop_molt_scores, 
+       family = binomial,
+       control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e+06)))
+```
+
+```{r, include=FALSE, eval=FALSE}
+RIS_season <- augment(mod_moult_sex_season_RIS) %>% dplyr::select(prop_molt_score, date_J, season, .fitted, sex)
+
+# back-transform the dates (i.e., Julian dates were optimized for Austral summer), note that the year is irrelevent here and is only kept for simplicity. We are mainly interested in matching the month and day part of the date string with the transformed Julian date
+dates_for_plot <-
+  data.frame(date = as.Date(c(as.Date("2021-07-01"):as.Date("2022-06-30"))),
+             date_J = c(1:365))
+df_season <- 
+  RIS_season %>% 
+  dplyr::group_by(sex, season, date_J) %>% 
+  dplyr::summarise(RIS = mean(.fitted))%>% 
+  mutate(RIS_trans = exp(RIS)/(1 + exp(RIS))) %>% 
+  left_join(., dates_for_plot, by = "date_J") %>% 
+  mutate(season = as.factor(season)) %>% 
+  filter(date > as.Date("2021-11-01"))
+
+ind_prop_molt_scores <- 
+  ind_prop_molt_scores %>% 
+  left_join(., dates_for_plot, by = "date_J") %>% 
+  filter(date > as.Date("2021-11-01"))
+
+# extract predicted trends
+pr <- ggeffects::predict_response(mod_moult_sex_season_RIS, c("date_J [30:293]", "sex"))
+
+# join the back-transformed dates to model fits
+mod_moult_sex_season_RIS_fits <- 
+  as.data.frame(pr) %>% 
+  rename(date_J = x,
+         sex = group) %>% 
+  left_join(., dates_for_plot, by = "date_J") %>% 
+  filter(date > as.Date("2021-11-01"))
+
+plot_rs_season <-
+  ggplot(data = df_season, 
+         aes(x = date, y = RIS_trans, colour = season, group = season)) + 
+  geom_line() +
+  theme(legend.position = c(0.3, 0.1),
+        legend.justification = c(1, 0),
+        legend.title = element_blank(),
+        text = element_text(family = "Verdana"),
+        axis.ticks = element_blank(),
+        axis.text.x = element_text(size = 10, 
+                                   angle = 45, 
+                                   hjust = 1, 
+                                   vjust = 1),
+        axis.text.y = element_text(size = 10, colour = "grey40"),
+        axis.title.y = element_text(size = 11, colour = "grey40"),
+        plot.margin = unit(c(0.2,0.2,0.2,0.2), "cm"),
+        panel.spacing = unit(1, "cm"),
+        panel.background = element_rect(fill = 'transparent', color = NA),
+        plot.background = element_rect(fill = 'transparent', color = NA), 
+        panel.grid.major.y = element_line(size = 0.25, lineend = "round", colour = "grey90"),
+        panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90"),
+        axis.title.x = element_blank()) +
+  scale_y_continuous(limits = c(-0.05, 1.05)) +
+  ylab("proportion intact of individual-based maximum rufous band") +
+  scale_x_date(date_labels = "%B", 
+               expand = c(0.01, 0.01), 
+               date_breaks = "1 month") +
+  scale_colour_brewer(palette = "Set2",
+                      name = "Season") +
+  ggtitle("year-specific slopes of\npre-basic moult timing (random)")
+
+# plot the model
+plot_rs_season_fs_sex <- 
+  ggplot() +
+  geom_line(data = mod_moult_sex_season_RIS_fits, 
+            aes(x = date, y = predicted, color = sex)) +
+  geom_ribbon(data = mod_moult_sex_season_RIS_fits, 
+              aes(x = date, ymax = conf.high, ymin = conf.low, fill = sex),
+              lwd = 1, alpha = 0.25) +
+  geom_jitter(data = ind_prop_molt_scores,
+              aes(x = date, y = prop_molt_score, color = sex), 
+              alpha = 0.25, shape = 20, width = 0, height = 0.025) +
+  theme(legend.position = c(0.55, 0.1),
+        # legend.background = element_rect(fill = 'transparent', color = NA),
+        legend.justification = c(1, 0),
+        legend.title = element_blank(),
+        text = element_text(family = "Verdana"),
+        axis.ticks = element_blank(),
+        axis.text.x = element_text(size = 10, 
+                                   angle = 45, 
+                                   hjust = 1, 
+                                   vjust = 1,
+                                   colour = "grey40"),
+        axis.text.y = element_blank(),
+        axis.title.y = element_blank(),
+        plot.margin = unit(c(0.2,0.2,0.2,0.2), "cm"),
+        panel.spacing = unit(1, "cm"),
+        panel.background = element_rect(fill = 'transparent', color = NA),
+        plot.background = element_rect(fill = 'transparent', color = NA), 
+        panel.grid.major.y = element_line(size = 0.25, lineend = "round", colour = "grey90"),
+        panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90"),
+        axis.title.x = element_blank()) +
+  scale_y_continuous(limits = c(-0.05, 1.05)) +
+  ylab("proportion intact of individual-based maximum rufous band") +
+  scale_x_date(date_labels = "%B", 
+               expand = c(0.01, 0.01), 
+               date_breaks = "1 month") +
+  scale_colour_brewer(palette = "Dark2", direction = -1,
+                      name = "Sex",
+                      labels = c("Female (N = 49)", "Male (N = 32)")) +
+  scale_fill_brewer(palette = "Dark2", direction = -1,
+                    name = "Sex",
+                    labels = c("Female (N = 49)", "Male (N = 32)")) +
+  ggtitle("sex-specific slopes\nof pre-basic moult timing (fixed)")
+
+plot_rs_season + plot_rs_season_fs_sex 
+
+```
+
+```{r}
+mod_moult_sex_bird_RIS <- 
+  lme4::glmer(prop_molt_score ~ 
+                date_J + sex + 
+         (date_J | rings_comb),
+       data = ind_prop_molt_scores, 
+       family = binomial,
+       control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e+06)))
+```
+
+```{r}
+RIS_bird <- augment(mod_moult_sex_bird_RIS) %>% dplyr::select(prop_molt_score, date_J, rings_comb, .fitted, sex)
+
+df_bird <- 
+  RIS_bird %>% 
+  dplyr::group_by(sex, rings_comb, date_J) %>% 
+  dplyr::summarise(RIS = mean(.fitted))%>% 
+  mutate(RIS_trans = exp(RIS)/(1 + exp(RIS))) %>% 
+  left_join(., dates_for_plot, by = "date_J") %>% 
+  mutate(rings_comb = as.factor(rings_comb)) %>% 
+  filter(date > as.Date("2021-11-01"))
+
+# extract predicted trends
+pr <- ggeffects::predict_response(mod_moult_sex_bird_RIS, c("date_J [30:293]", "sex"))
+
+# join the back-transformed dates to model fits
+mod_moult_sex_bird_RIS_fits <- 
+  as.data.frame(pr) %>% 
+  rename(date_J = x,
+         sex = group) %>% 
+  left_join(., dates_for_plot, by = "date_J") %>% 
+  filter(date > as.Date("2021-11-01"))
+
+plot_rs_bird <-
+  ggplot(data = df_bird, 
+         aes(x = date, y = RIS_trans, 
+             colour = rings_comb, 
+             group = rings_comb)) + 
+  geom_line() +
+  theme(legend.position = "none",
+        legend.justification = c(1, 0),
+        legend.title = element_blank(),
+        text = element_text(family = "Verdana"),
+        axis.ticks = element_blank(),
+        axis.text.x = element_text(size = 10, 
+                                   angle = 45, 
+                                   hjust = 1, 
+                                   vjust = 1),
+        axis.text.y = element_text(size = 10, colour = "grey40"),
+        axis.title.y = element_text(size = 11, colour = "grey40"),
+        plot.margin = unit(c(0.2,0.2,0.2,0.2), "cm"),
+        panel.spacing = unit(1, "cm"),
+        panel.background = element_rect(fill = 'transparent', color = NA),
+        plot.background = element_rect(fill = 'transparent', color = NA), 
+        panel.grid.major.y = element_line(size = 0.25, lineend = "round", colour = "grey90"),
+        panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90"),
+        axis.title.x = element_blank()) +
+  scale_y_continuous(limits = c(-0.05, 1.05)) +
+  ylab("proportion intact of individual-based maximum rufous band") +
+  scale_x_date(date_labels = "%B", 
+               expand = c(0.01, 0.01), 
+               date_breaks = "1 month") +
+  ggtitle("bird-specific slopes of\npre-basic moult timing (random)")
+
+# plot the model
+plot_rs_bird_fs_sex <- 
+  ggplot() +
+  geom_line(data = mod_moult_sex_bird_RIS_fits, 
+            aes(x = date, y = predicted, color = sex)) +
+  geom_ribbon(data = mod_moult_sex_bird_RIS_fits, 
+              aes(x = date, ymax = conf.high, ymin = conf.low, fill = sex),
+              lwd = 1, alpha = 0.25) +
+  geom_jitter(data = ind_prop_molt_scores,
+              aes(x = date, y = prop_molt_score, color = sex), 
+              alpha = 0.25, shape = 20, width = 0, height = 0.025) +
+  theme(legend.position = c(0.55, 0.1),
+        # legend.background = element_rect(fill = 'transparent', color = NA),
+        legend.justification = c(1, 0),
+        legend.title = element_blank(),
+        text = element_text(family = "Verdana"),
+        axis.ticks = element_blank(),
+        axis.text.x = element_text(size = 10, 
+                                   angle = 45, 
+                                   hjust = 1, 
+                                   vjust = 1,
+                                   colour = "grey40"),
+        axis.text.y = element_blank(),
+        axis.title.y = element_blank(),
+        plot.margin = unit(c(0.2,0.2,0.2,0.2), "cm"),
+        panel.spacing = unit(1, "cm"),
+        panel.background = element_rect(fill = 'transparent', color = NA),
+        plot.background = element_rect(fill = 'transparent', color = NA), 
+        panel.grid.major.y = element_line(size = 0.25, lineend = "round", colour = "grey90"),
+        panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90"),
+        axis.title.x = element_blank()) +
+  scale_y_continuous(limits = c(-0.05, 1.05)) +
+  ylab("proportion intact of individual-based maximum rufous band") +
+  scale_x_date(date_labels = "%B", 
+               expand = c(0.01, 0.01), 
+               date_breaks = "1 month") +
+  scale_colour_brewer(palette = "Dark2", direction = -1,
+                      name = "Sex",
+                      labels = c("Female (N = 49)", "Male (N = 32)")) +
+  scale_fill_brewer(palette = "Dark2", direction = -1,
+                    name = "Sex",
+                    labels = c("Female (N = 49)", "Male (N = 32)")) +
+  ggtitle("sex-specific slopes\nof pre-basic moult timing (fixed)")
+
+plot_rs_bird + plot_rs_bird_fs_sex 
+
+```
+
+```{r}
+mod_moult_sex_bird_season_RIS <- 
+  lme4::glmer(prop_molt_score ~ 
+                date_J + sex + 
+         (date_J | rings_comb) + (date_J | season),
+       data = ind_prop_molt_scores, 
+       family = binomial,
+       control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e+06)))
+```
+
+```{r}
+RIS_bird_season <- 
+  augment(mod_moult_sex_bird_season_RIS) %>% 
+  dplyr::select(prop_molt_score, date_J, rings_comb, season, .fitted, sex)
+
+df_bird_season <- 
+  RIS_bird_season %>% 
+  dplyr::group_by(sex, season, rings_comb, date_J) %>% 
+  dplyr::summarise(RIS = mean(.fitted)) %>% 
+  mutate(RIS_trans = exp(RIS)/(1 + exp(RIS))) %>% 
+  left_join(., dates_for_plot, by = "date_J") %>% 
+  mutate(rings_comb = as.factor(rings_comb),
+         season = as.factor(season)) %>% 
+  filter(date > as.Date("2021-11-01")) %>% 
+  mutate(bird_season = paste(rings_comb, season, sep = "_"))
+
+# extract predicted trends
+pr <- ggeffects::predict_response(mod_moult_sex_bird_season_RIS, c("date_J [30:293]", "sex"))
+
+# join the back-transformed dates to model fits
+mod_moult_sex_bird_season_RIS_fits <- 
+  as.data.frame(pr) %>% 
+  rename(date_J = x,
+         sex = group) %>% 
+  left_join(., dates_for_plot, by = "date_J") %>% 
+  filter(date > as.Date("2021-11-01"))
+
+plot_rs_bird <-
+  ggplot(data = df_bird_season, 
+         aes(x = date, y = RIS_trans, 
+             colour = rings_comb, 
+             group = bird_season)) + 
+  geom_line() +
+  theme(legend.position = "none",
+        legend.justification = c(1, 0),
+        legend.title = element_blank(),
+        text = element_text(family = "Verdana"),
+        axis.ticks = element_blank(),
+        axis.text.x = element_text(size = 10, 
+                                   angle = 45, 
+                                   hjust = 1, 
+                                   vjust = 1),
+        axis.text.y = element_text(size = 10, colour = "grey40"),
+        axis.title.y = element_text(size = 11, colour = "grey40"),
+        plot.margin = unit(c(0.2,0.2,0.2,0.2), "cm"),
+        panel.spacing = unit(1, "cm"),
+        panel.background = element_rect(fill = 'transparent', color = NA),
+        plot.background = element_rect(fill = 'transparent', color = NA), 
+        panel.grid.major.y = element_line(size = 0.25, lineend = "round", colour = "grey90"),
+        panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90"),
+        axis.title.x = element_blank()) +
+  scale_y_continuous(limits = c(-0.05, 1.05)) +
+  ylab("proportion intact of individual-based maximum rufous band") +
+  scale_x_date(date_labels = "%B", 
+               expand = c(0.01, 0.01), 
+               date_breaks = "1 month") +
+  ggtitle("bird- and year-specific slopes of\npre-basic moult timing (random)")
+
+# plot the model
+plot_rs_bird_season_fs_sex <- 
+  ggplot() +
+  geom_line(data = mod_moult_sex_bird_season_RIS_fits, 
+            aes(x = date, y = predicted, color = sex)) +
+  geom_ribbon(data = mod_moult_sex_bird_season_RIS_fits, 
+              aes(x = date, ymax = conf.high, ymin = conf.low, fill = sex),
+              lwd = 1, alpha = 0.25) +
+  geom_jitter(data = ind_prop_molt_scores,
+              aes(x = date, y = prop_molt_score, color = sex), 
+              alpha = 0.25, shape = 20, width = 0, height = 0.025) +
+  theme(legend.position = c(0.55, 0.1),
+        # legend.background = element_rect(fill = 'transparent', color = NA),
+        legend.justification = c(1, 0),
+        legend.title = element_blank(),
+        text = element_text(family = "Verdana"),
+        axis.ticks = element_blank(),
+        axis.text.x = element_text(size = 10, 
+                                   angle = 45, 
+                                   hjust = 1, 
+                                   vjust = 1,
+                                   colour = "grey40"),
+        axis.text.y = element_blank(),
+        axis.title.y = element_blank(),
+        plot.margin = unit(c(0.2,0.2,0.2,0.2), "cm"),
+        panel.spacing = unit(1, "cm"),
+        panel.background = element_rect(fill = 'transparent', color = NA),
+        plot.background = element_rect(fill = 'transparent', color = NA), 
+        panel.grid.major.y = element_line(size = 0.25, lineend = "round", colour = "grey90"),
+        panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90"),
+        axis.title.x = element_blank()) +
+  scale_y_continuous(limits = c(-0.05, 1.05)) +
+  ylab("proportion intact of individual-based maximum rufous band") +
+  scale_x_date(date_labels = "%B", 
+               expand = c(0.01, 0.01), 
+               date_breaks = "1 month") +
+  scale_colour_brewer(palette = "Dark2", direction = -1,
+                      name = "Sex",
+                      labels = c("Female (N = 49)", "Male (N = 32)")) +
+  scale_fill_brewer(palette = "Dark2", direction = -1,
+                    name = "Sex",
+                    labels = c("Female (N = 49)", "Male (N = 32)")) +
+  ggtitle("sex-specific slopes\nof pre-basic moult timing (fixed)")
+
+plot_rs_bird + plot_rs_bird_fs_sex 
+
+```
+
+```{r, include=FALSE, eval=FALSE}
+mod_moult_sex_bird_season_RIS <- 
+  lme4::glmer(prop_molt_score ~ 
+                date_J + sex + 
+         (date_J | rings_comb) + (date_J | season),
+       data = ind_prop_molt_scores, 
+       family = binomial,
+       control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e+06)))
+
+# quick look at effect
+plot(allEffects(mod_moult_sex_bird_season_RIS), type = "response")
+tbl_regression(mod_moult_sex_bird_season_RIS)
+
+# Derive confidence intervals of effect sizes from parametric bootstrapping
+tidy_mod_moult_sex_bird_season_RIS <-
+  tidy(mod_moult_sex_bird_season_RIS, conf.int = TRUE)
+
+# run rptR to obtain repeatabilities of random effects
+rpt_mod_moult_sex <-
+  rpt(prop_molt_score ~ date_J + sex + 
+         (date_J | rings_comb) + (date_J | season),
+      grname = c("rings_comb", "season", "Fixed"),
+      data = ind_prop_molt_scores,
+      datatype = "Binary",
+      nboot = 1000, npermut = 1000, ratio = TRUE,
+      adjusted = TRUE, ncores = 4, parallel = TRUE)
+
+# run partR2 on each model to obtain marginal R2, parameter estimates, and beta
+# weights
+R2m_mod_moult_sex_bird_season_RIS <-
+  partR2(mod_moult_sex_bird_season_RIS,
+         partvars = c("date_J", "sex"),
+         R2_type = "marginal",
+         nboot = 1000,
+         CI = 0.95,
+         max_level = 1)
+
+R2c_mod_moult_sex_bird_season_RIS <-
+  partR2(mod_moult_sex_bird_season_RIS,
+         partvars = c("date_J", "sex"),
+         R2_type = "conditional",
+         nboot = 1000,
+         CI = 0.95,
+         max_level = 1)
+
+stats_mod_moult_sex <-
+  list(mod = mod_moult_sex,
+       tidy = tidy_mod_moult_sex,
+       rptR = rpt_mod_moult_sex,
+       partR2m = R2m_mod_moult_sex,
+       partR2c = R2c_mod_moult_sex,
+       data = ind_prop_molt_scores)
+```
+
+```{r, include=FALSE}
+# saveRDS(stats_mod_moult_sex, file = "out/stats_mod_moult_sex.rds")
+stats_mod_moult_sex <- readRDS(file = "/Users/luketheduke2/ownCloud/kemp_projects/bdot/moult/out/stats_mod_moult_sex.rds")
+```
+
+```{r, include=FALSE}
+#### Table of effect sizes ----
+# Retrieve sample sizes
+sample_sizes <-
+  ind_breeding_scores %>% 
+  ungroup() %>% 
+  summarise(Year = n_distinct(season),
+            Individual = n_distinct(rings_comb),
+            Observations = nrow(.))
+
+sample_sizes <- 
+  as.data.frame(t(as.data.frame(sample_sizes))) %>%
+  rownames_to_column("term") %>% 
+  rename(estimate = V1) %>% 
+  mutate(stat = "n")
+
+# clean model component names
+mod_comp_names <- 
+  data.frame(comp_name = c("Male (Sex)",
+                           "Total Marginal \U1D479\U00B2",
+                           "Sex",
+                           "Total Conditional \U1D479\U00B2",
+                           "Individual",
+                           "Year",
+                           "Residual",
+                           "Individual",
+                           "Year",
+                           "Residual",
+                           "Years",
+                           "Individuals",
+                           "Observations"))
+
+# Fixed effect sizes (non-standardized)
+fixefTable <- 
+  stats_mod_moult_sex$tidy %>% 
+  dplyr::filter(effect == "fixed") %>% 
+  dplyr::select(term, estimate, conf.low, conf.high) %>% 
+  as.data.frame() %>% 
+  mutate(stat = "fixed")
+
+# Fixed effect sizes (standardized)
+fixef_bw_Table <- 
+  stats_mod_moult_sex$partR2m$BW %>% 
+  as.data.frame() %>% 
+  mutate(stat = "fixed_bw") %>% 
+  rename(conf.low = CI_lower,
+         conf.high = CI_upper)
+
+# Semi-partial R2 estimates
+R2Table <- 
+  bind_rows(stats_mod_moult_sex$partR2m$R2,
+            stats_mod_moult_sex$partR2c$R2[1,]) %>% 
+  dplyr::select(term, estimate, CI_lower, CI_upper) %>% 
+  as.data.frame() %>% 
+  mutate(stat = "partR2") %>% 
+  rename(conf.low = CI_lower,
+         conf.high = CI_upper)
+
+# Random effects variances
+ranefTable <- 
+  stats_mod_moult_sex$tidy %>% 
+  dplyr::filter(effect == "ran_pars") %>% 
+  dplyr::select(group, estimate, conf.low, conf.high) %>% 
+  as.data.frame() %>% 
+  mutate(stat = "rand") %>% 
+  rename(term = group) %>% 
+  mutate(estimate = estimate^2,
+         conf.high = conf.high^2,
+         conf.low = conf.low^2)
+
+# Adjusted repeatabilities
+coefRptTable <- 
+  stats_mod_moult_sex$rptR$R_boot %>% 
+  dplyr::select(-Fixed) %>% 
+  mutate(residual = 1 - rowSums(.)) %>% 
+  apply(., 2, 
+        function(x) c(mean (x), quantile (x, prob = c(0.025, 0.975)))) %>% 
+  t() %>% 
+  as.data.frame() %>% 
+  rownames_to_column("term") %>% 
+  rename(estimate = V1,
+         conf.low = `2.5%`,
+         conf.high = `97.5%`) %>% 
+  mutate(stat = "RptR")
+
+# Store all parameters into a single table and clean it up
+allCoefs_mod <- 
+  bind_rows(fixef_bw_Table,
+            R2Table,
+            ranefTable, 
+            coefRptTable, 
+            sample_sizes) %>% 
+  bind_cols(.,
+            mod_comp_names) %>%
+  mutate(coefString = ifelse(!is.na(conf.low),
+                             paste0("[", 
+                                    round(conf.low, 2), ", ", 
+                                    round(conf.high, 2), "]"),
+                             NA),
+         effect = c(rep("Fixed effects \U1D6FD (standardized)", nrow(fixef_bw_Table)),
+                    rep("Partitioned \U1D479\U00B2", nrow(R2Table)),
+                    rep("Random effects \U1D70E\U00B2", nrow(ranefTable)),
+                    rep("Adjusted repeatability \U1D45F", nrow(coefRptTable)),
+                    rep("Sample sizes \U1D45B", nrow(sample_sizes)))) %>%
+  dplyr::select(effect, everything())
+
+# draw gt table
+mod_moult_sex_table <- 
+  allCoefs_mod %>% 
+  dplyr::select(effect, comp_name, estimate, coefString) %>% 
+  gt(rowname_col = "row",
+     groupname_col = "effect") %>% 
+  cols_label(comp_name = html("<i>Banded Dotterel pre-basic moult</i>"),
              estimate = "Mean estimate",
              coefString = "95% confidence interval") %>% 
   fmt_number(columns = c(estimate),
@@ -1183,89 +1895,12 @@ mod_max_score_table_status_sex <-
               summary_row.padding = 2,
               column_labels.font.size = 14,
               row_group.font.size = 12,
-              table.width = pct(80))
+              table.width = pct(100))
 ```
 
-#### effect-size table and plot for sex- and migratory-status breeding plumage
-no effect of migratory status on an individual's rufous band score while controlling for underlying sex-specific variation
-```{r, include=FALSE}
-mod_max_score_table_status_sex
-
-effects_mod_max_score_status_sex2 <- 
-  as.data.frame(allEffects(mod_max_score_status_sex)$migratory_status) %>%
-  mutate(x_mean = ifelse(migratory_status == "M", as.numeric(factor(migratory_status)) + 0.2,
-                         ifelse(migratory_status == "R", as.numeric(factor(migratory_status)) - 0.2, NA)),
-         x_data = ifelse(migratory_status == "M", as.numeric(factor(migratory_status)), 
-                          ifelse(migratory_status == "R", as.numeric(factor(migratory_status)), NA)))
-
-ggplot() +
-  geom_errorbar(data = effects_mod_max_score_status_sex2, 
-                aes(x = x_mean, ymin = lower, ymax = upper), width = 0.05) +
-  geom_point(data = effects_mod_max_score_status_sex2, 
-             aes(x = x_mean, y = fit, fill = migratory_status), shape = 21, size = 5) +
-  geom_jitter(data = ind_breeding_scores_status,
-             aes(x = as.numeric(factor(migratory_status)), 
-                 y = max_breeding_score, fill = migratory_status), 
-             width = 0.05, height = 0.1, shape = 21, size = 3, alpha = 0.75) +
-  theme(legend.position = "none",
-        text = element_text(family = "lato"),
-        axis.ticks = element_blank(),
-        axis.text = element_text(size = 10, colour = "grey40"),
-        axis.title.y = element_text(size = 11, colour = "grey40"),
-        axis.text.y = element_blank(),
-        plot.margin = unit(c(0.2,0.2,0.2,0.2), "cm"),
-        panel.spacing = unit(1, "cm"),
-        panel.background = element_rect(fill = 'transparent', color = NA),
-        plot.background = element_rect(fill = 'transparent', color = NA), 
-        panel.grid.major.y = element_line(size = 0.25, lineend = "round", colour = "grey90"),
-        panel.grid.minor = element_blank(),
-        panel.grid.major.x = element_blank(),
-        axis.title.x = element_blank()) +
-  scale_x_continuous(limits = c(0.8, 2.2), 
-                     breaks = c(1.1, 1.9), 
-                     labels = c("migrant", "resident")) +
-  ylab("maximum breeding plumage score observed") +
-  scale_fill_brewer(palette = "Set1") +
-  scale_y_continuous(limits = c(3.8, 7.2))
-```
-
-### Within-individual moult dynamics across sexes
-```{r}
-# calculate the individual proportional moult scores by comparing each score to a given individual's max (determined in previous chunk). Piece apart variation in sex while accounting for sex differences in maximum rufous band score.
-ind_prop_molt_scores <- 
-  dat %>% 
-  mutate(score = as.numeric(score)) %>% 
-  left_join(., select(ind_breeding_scores, -sex), by = c("rings_comb","season")) %>% 
-  filter(!is.na(max_breeding_score)) %>% 
-  mutate(prop_molt_score = (score-1)/(max_breeding_score-1)) %>%
-  select(rings_comb, season, date_J, sex, score, max_breeding_score, prop_molt_score) %>% 
-  arrange(rings_comb, season, date_J) %>% 
-  distinct() %>% 
-  filter(!is.na(prop_molt_score)) %>%
-  group_by(sex) %>%
-  mutate(std_max_breeding_score = (max_breeding_score - mean(max_breeding_score, na.rm = TRUE)) / sd(max_breeding_score, na.rm = TRUE)) %>%
-  ungroup()
-
-# Assess sample sizes of each sex
-ind_prop_molt_scores %>% 
-  group_by(sex) %>% 
-  summarise(n_distinct(rings_comb))
-
-# mixed effects binomial model comparing sex and date effect on the changes in moult scores while controlling for between sex differences in the maximum breeding score
-mod1 <- 
-  lme4::glmer(prop_molt_score ~ 
-                date_J * sex + std_max_breeding_score +
-         (1 | rings_comb),
-       data = ind_prop_molt_scores, 
-       family = binomial,
-       control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e+06)))
-
-# strong date effect, but no sex effect
-tbl_regression(mod1, intercept = TRUE, 
-               label = list(date_J ~ "Date", sex ~ "Sex"))
-
+```{r, include=FALSE, eval=FALSE}
 # extract predicted trends
-pr <- ggeffects::predict_response(mod1, c("date_J [30:293]", "sex"))
+pr <- ggeffects::predict_response(mod_moult_sex, c("date_J [30:293]", "sex"))
 
 # back-transform the dates (i.e., Julian dates were optimized for Austral summer), note that the year is irrelevent here and is only kept for simplicity. We are mainly interested in matching the month and day part of the date string with the transformed Julian date
 dates_for_plot <-
@@ -1273,7 +1908,7 @@ dates_for_plot <-
              date_J = c(1:365))
 
 # join the back-transformed dates to model fits
-mod1_fits <- 
+mod_moult_sex_fits <- 
   as.data.frame(pr) %>% 
   rename(date_J = x,
          sex = group) %>% 
@@ -1285,9 +1920,9 @@ ind_prop_molt_scores <-
 
 # plot the model
 ggplot() +
-  geom_line(data = mod1_fits, 
+  geom_line(data = mod_moult_sex_fits, 
             aes(x = date, y = predicted, color = sex)) +
-  geom_ribbon(data = mod1_fits, 
+  geom_ribbon(data = mod_moult_sex_fits, 
               aes(x = date, ymax = conf.high, ymin = conf.low, fill = sex),
               lwd = 1, alpha = 0.25) +
   geom_jitter(data = ind_prop_molt_scores,
@@ -1295,7 +1930,8 @@ ggplot() +
               alpha = 0.25, shape = 20, width = 0, height = 0.025) +
   theme(legend.position = c(0.3, 0.2),
         legend.justification = c(1, 0),
-        text = element_text(family = "lato"),
+        legend.title = element_blank(),
+        text = element_text(family = "Verdana"),
         axis.ticks = element_blank(),
         axis.text.x = element_text(size = 10, 
                                    angle = 45, 
@@ -1317,10 +1953,10 @@ ggplot() +
                date_breaks = "1 month") +
   scale_colour_brewer(palette = "Dark2", direction = -1,
                       name = "Sex",
-                      labels = c("Female (N = 49)", "Male (N = 35)")) +
+                      labels = c("Female (N = 49)", "Male (N = 32)")) +
   scale_fill_brewer(palette = "Dark2", direction = -1,
                     name = "Sex",
-                    labels = c("Female (N = 49)", "Male (N = 35)"))
+                    labels = c("Female (N = 49)", "Male (N = 32)"))
 ```
 
 ```{r}
@@ -1435,7 +2071,7 @@ ggplot() +
               alpha = 0.25, shape = 20, width = 0, height = 0.025) +
   theme(legend.position = c(0.3, 0.2),
         legend.justification = c(1, 0),
-        text = element_text(family = "lato"),
+        text = element_text(family = "Verdana"),
         axis.ticks = element_blank(),
         axis.text.x = element_text(size = 10, 
                                    angle = 45, 
@@ -1530,7 +2166,7 @@ ggplot() +
               alpha = 0.25, shape = 20, width = 0, height = 0.025) +
   theme(legend.position = c(0.3, 0.2),
         legend.justification = c(1, 0),
-        text = element_text(family = "lato"),
+        text = element_text(family = "Verdana"),
         axis.ticks = element_blank(),
         axis.text.x = element_text(size = 10, 
                                    angle = 45, 
