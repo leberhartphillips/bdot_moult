@@ -159,6 +159,14 @@ luke_theme <-
   )
 ```
 
+```{r}
+# Define a custom mode function
+get_mode <- function(x) {
+  uniq_vals <- unique(x)
+  uniq_vals[which.max(tabulate(match(x, uniq_vals)))]
+}
+```
+
 ## Exploration of moult data extracted from photos
 
 Note: data last modified 7-Nov-2024
@@ -258,7 +266,7 @@ dat %>%
   pull(rings_comb) %>% unique() %>% length()
 ```
 
-assess how many individuals have more than a single seasons of data
+assess how many individuals have more than a single season of data
 ```{r, echo = FALSE}
 dat %>%
   select(rings_comb, season) %>% 
@@ -425,14 +433,18 @@ ggplot(data = dat %>% filter(season == 2023 & sex == "M") %>% mutate(score = as.
 data wrangle for sex model
 ```{r}
 # extract the core breeding months (i.e., when presumably all birds are at their maximum breeding plumage), and determine the maximum score for each individual.
-ind_breeding_scores <- 
+ind_breeding_scores <-
   dat %>% 
   mutate(score = as.numeric(score)) %>% 
   mutate(breeding_season = ifelse(month(date) %in% c(8, 9, 10, 11, 12), 1, 0)) %>% 
   filter(breeding_season == 1) %>% 
-  group_by(season, rings_comb, sex) %>% 
-  summarise(max_breeding_score = max(score)) %>% 
-  ungroup()
+  group_by(season, rings_comb, sex) %>% #filter(rings_comb == "RRBY") %>% select(score, date)
+  summarise(max_breeding_score = max(score),
+            date_of_max_score = date[which.max(score)],
+            mode_breeding_score = get_mode(score)) %>% 
+  ungroup() %>% 
+  mutate(max_breeding_score_mean = round((max_breeding_score + mode_breeding_score)/2)) %>% 
+  mutate(date_J_of_max_score = as.numeric(format(date_of_max_score + 181, "%j"))) 
 ```
 
 Assess sample sizes of each sex
@@ -1307,25 +1319,30 @@ ggplot() +
 
 ## Sources of individual variation in the timing of pre-basic moult
 ### Within-individual moult dynamics across sexes
-wrangle data by calculating the individual proportional moult scores by comparing each score to a given individual's max (determined in previous chunk). Piece apart sex-specific variation in the timing of pre-basic moult while accounting for sex differences in maximum rufous band score
-```{r}
-ind_prop_molt_scores <- 
+wrangle data by calculating the individual proportional moult scores by comparing each score to a given individual's max (determined in previous chunk). Piece apart sex-specific variation in the timing of pre-basic moult
+```{r, include=FALSE}
+ind_prop_molt_scores <-
   dat %>% 
   mutate(score = as.numeric(score)) %>% 
   left_join(., select(ind_breeding_scores, -sex), by = c("rings_comb","season")) %>% 
-  filter(!is.na(max_breeding_score)) %>%
+  filter(!is.na(max_breeding_score)) %>% 
+  filter(date_J_of_max_score <= date_J) %>%
   group_by(sex) %>%
   mutate(std_max_breeding_score = 
            (max_breeding_score - mean(max_breeding_score, na.rm = TRUE)) / sd(max_breeding_score, na.rm = TRUE)) %>% 
   # focus on key months of moult (Nov, Dec, Jan, Feb, March) 
-  filter(month(date) %in% c(11, 12, 1, 2, 3)) %>% 
+  filter(month(date) %in% c(11, 12, 1, 2, 3)) %>%
   # subtract 1 to make minimum score 0
-  mutate(prop_molt_score = (score-1)/(max_breeding_score-1)) %>%
-  select(rings_comb, season, date_J, sex, score, max_breeding_score, std_max_breeding_score, prop_molt_score) %>% 
+  mutate(prop_molt_score_max = (score-1)/(max_breeding_score-1),
+         prop_molt_score_mode = (score-1)/(mode_breeding_score-1),
+         prop_molt_score_max_mean = (score-1)/(max_breeding_score_mean-1)) %>%
+  select(rings_comb, season, date_J, sex, migratory_status, age, score, max_breeding_score, mode_breeding_score, max_breeding_score_mean, std_max_breeding_score, prop_molt_score_max, prop_molt_score_mode, prop_molt_score_max_mean) %>% 
   arrange(rings_comb, season, date_J) %>% 
   distinct() %>% 
-  filter(!is.na(prop_molt_score)) %>%
-  ungroup()
+  filter(!is.na(prop_molt_score_max)) %>%
+  ungroup() %>% 
+  mutate(prop_molt_score_max_mean = ifelse(prop_molt_score_max_mean > 1, 1, prop_molt_score_max_mean),
+         prop_molt_score_mode = ifelse(prop_molt_score_mode > 1, 1, prop_molt_score_mode)) 
 ```
 
 Assess sample sizes of each sex
@@ -1335,268 +1352,29 @@ ind_prop_molt_scores %>%
   summarise(n_distinct(rings_comb))
 ```
 
-mixed effects binomial model assessing an interaction between sex and date on changes in moult scores while controlling for between sex differences in the maximum breeding score
-```{r, warning=FALSE}
-mod_moult_sex <- 
-  lme4::glmer(prop_molt_score ~ 
-                date_J * sex +
-         (1 | rings_comb) + (1 | season),
-       data = ind_prop_molt_scores, 
-       family = binomial,
-       control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e+06)))
-```
-
-```{r, warning=FALSE}
-mod_moult_sex_season_RIS <- 
-  lme4::glmer(prop_molt_score ~ 
-                date_J + sex + 
-         (date_J | season),
-       data = ind_prop_molt_scores, 
-       family = binomial,
-       control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e+06)))
-```
-
-```{r, include=FALSE, eval=FALSE}
-RIS_season <- augment(mod_moult_sex_season_RIS) %>% dplyr::select(prop_molt_score, date_J, season, .fitted, sex)
-
-# back-transform the dates (i.e., Julian dates were optimized for Austral summer), note that the year is irrelevent here and is only kept for simplicity. We are mainly interested in matching the month and day part of the date string with the transformed Julian date
-dates_for_plot <-
-  data.frame(date = as.Date(c(as.Date("2021-07-01"):as.Date("2022-06-30"))),
-             date_J = c(1:365))
-df_season <- 
-  RIS_season %>% 
-  dplyr::group_by(sex, season, date_J) %>% 
-  dplyr::summarise(RIS = mean(.fitted))%>% 
-  mutate(RIS_trans = exp(RIS)/(1 + exp(RIS))) %>% 
-  left_join(., dates_for_plot, by = "date_J") %>% 
-  mutate(season = as.factor(season)) %>% 
-  filter(date > as.Date("2021-11-01"))
-
-ind_prop_molt_scores <- 
-  ind_prop_molt_scores %>% 
-  left_join(., dates_for_plot, by = "date_J") %>% 
-  filter(date > as.Date("2021-11-01"))
-
-# extract predicted trends
-pr <- ggeffects::predict_response(mod_moult_sex_season_RIS, c("date_J [30:293]", "sex"))
-
-# join the back-transformed dates to model fits
-mod_moult_sex_season_RIS_fits <- 
-  as.data.frame(pr) %>% 
-  rename(date_J = x,
-         sex = group) %>% 
-  left_join(., dates_for_plot, by = "date_J") %>% 
-  filter(date > as.Date("2021-11-01"))
-
-plot_rs_season <-
-  ggplot(data = df_season, 
-         aes(x = date, y = RIS_trans, colour = season, group = season)) + 
-  geom_line() +
-  theme(legend.position = c(0.3, 0.1),
-        legend.justification = c(1, 0),
-        legend.title = element_blank(),
-        text = element_text(family = "Verdana"),
-        axis.ticks = element_blank(),
-        axis.text.x = element_text(size = 10, 
-                                   angle = 45, 
-                                   hjust = 1, 
-                                   vjust = 1),
-        axis.text.y = element_text(size = 10, colour = "grey40"),
-        axis.title.y = element_text(size = 11, colour = "grey40"),
-        plot.margin = unit(c(0.2,0.2,0.2,0.2), "cm"),
-        panel.spacing = unit(1, "cm"),
-        panel.background = element_rect(fill = 'transparent', color = NA),
-        plot.background = element_rect(fill = 'transparent', color = NA), 
-        panel.grid.major.y = element_line(size = 0.25, lineend = "round", colour = "grey90"),
-        panel.grid.minor = element_blank(),
-        panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90"),
-        axis.title.x = element_blank()) +
-  scale_y_continuous(limits = c(-0.05, 1.05)) +
-  ylab("proportion intact of individual-based maximum rufous band") +
-  scale_x_date(date_labels = "%B", 
-               expand = c(0.01, 0.01), 
-               date_breaks = "1 month") +
-  scale_colour_brewer(palette = "Set2",
-                      name = "Season") +
-  ggtitle("year-specific slopes of\npre-basic moult timing (random)")
-
-# plot the model
-plot_rs_season_fs_sex <- 
-  ggplot() +
-  geom_line(data = mod_moult_sex_season_RIS_fits, 
-            aes(x = date, y = predicted, color = sex)) +
-  geom_ribbon(data = mod_moult_sex_season_RIS_fits, 
-              aes(x = date, ymax = conf.high, ymin = conf.low, fill = sex),
-              lwd = 1, alpha = 0.25) +
-  geom_jitter(data = ind_prop_molt_scores,
-              aes(x = date, y = prop_molt_score, color = sex), 
-              alpha = 0.25, shape = 20, width = 0, height = 0.025) +
-  theme(legend.position = c(0.55, 0.1),
-        # legend.background = element_rect(fill = 'transparent', color = NA),
-        legend.justification = c(1, 0),
-        legend.title = element_blank(),
-        text = element_text(family = "Verdana"),
-        axis.ticks = element_blank(),
-        axis.text.x = element_text(size = 10, 
-                                   angle = 45, 
-                                   hjust = 1, 
-                                   vjust = 1,
-                                   colour = "grey40"),
-        axis.text.y = element_blank(),
-        axis.title.y = element_blank(),
-        plot.margin = unit(c(0.2,0.2,0.2,0.2), "cm"),
-        panel.spacing = unit(1, "cm"),
-        panel.background = element_rect(fill = 'transparent', color = NA),
-        plot.background = element_rect(fill = 'transparent', color = NA), 
-        panel.grid.major.y = element_line(size = 0.25, lineend = "round", colour = "grey90"),
-        panel.grid.minor = element_blank(),
-        panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90"),
-        axis.title.x = element_blank()) +
-  scale_y_continuous(limits = c(-0.05, 1.05)) +
-  ylab("proportion intact of individual-based maximum rufous band") +
-  scale_x_date(date_labels = "%B", 
-               expand = c(0.01, 0.01), 
-               date_breaks = "1 month") +
-  scale_colour_brewer(palette = "Dark2", direction = -1,
-                      name = "Sex",
-                      labels = c("Female (N = 49)", "Male (N = 32)")) +
-  scale_fill_brewer(palette = "Dark2", direction = -1,
-                    name = "Sex",
-                    labels = c("Female (N = 49)", "Male (N = 32)")) +
-  ggtitle("sex-specific slopes\nof pre-basic moult timing (fixed)")
-
-plot_rs_season + plot_rs_season_fs_sex 
-
-```
-
-```{r}
-mod_moult_sex_bird_RIS <- 
-  lme4::glmer(prop_molt_score ~ 
-                date_J + sex + 
-         (date_J | rings_comb),
-       data = ind_prop_molt_scores, 
-       family = binomial,
-       control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e+06)))
-```
-
-```{r}
-RIS_bird <- augment(mod_moult_sex_bird_RIS) %>% dplyr::select(prop_molt_score, date_J, rings_comb, .fitted, sex)
-
-df_bird <- 
-  RIS_bird %>% 
-  dplyr::group_by(sex, rings_comb, date_J) %>% 
-  dplyr::summarise(RIS = mean(.fitted))%>% 
-  mutate(RIS_trans = exp(RIS)/(1 + exp(RIS))) %>% 
-  left_join(., dates_for_plot, by = "date_J") %>% 
-  mutate(rings_comb = as.factor(rings_comb)) %>% 
-  filter(date > as.Date("2021-11-01"))
-
-# extract predicted trends
-pr <- ggeffects::predict_response(mod_moult_sex_bird_RIS, c("date_J [30:293]", "sex"))
-
-# join the back-transformed dates to model fits
-mod_moult_sex_bird_RIS_fits <- 
-  as.data.frame(pr) %>% 
-  rename(date_J = x,
-         sex = group) %>% 
-  left_join(., dates_for_plot, by = "date_J") %>% 
-  filter(date > as.Date("2021-11-01"))
-
-plot_rs_bird <-
-  ggplot(data = df_bird, 
-         aes(x = date, y = RIS_trans, 
-             colour = rings_comb, 
-             group = rings_comb)) + 
-  geom_line() +
-  theme(legend.position = "none",
-        legend.justification = c(1, 0),
-        legend.title = element_blank(),
-        text = element_text(family = "Verdana"),
-        axis.ticks = element_blank(),
-        axis.text.x = element_text(size = 10, 
-                                   angle = 45, 
-                                   hjust = 1, 
-                                   vjust = 1),
-        axis.text.y = element_text(size = 10, colour = "grey40"),
-        axis.title.y = element_text(size = 11, colour = "grey40"),
-        plot.margin = unit(c(0.2,0.2,0.2,0.2), "cm"),
-        panel.spacing = unit(1, "cm"),
-        panel.background = element_rect(fill = 'transparent', color = NA),
-        plot.background = element_rect(fill = 'transparent', color = NA), 
-        panel.grid.major.y = element_line(size = 0.25, lineend = "round", colour = "grey90"),
-        panel.grid.minor = element_blank(),
-        panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90"),
-        axis.title.x = element_blank()) +
-  scale_y_continuous(limits = c(-0.05, 1.05)) +
-  ylab("proportion intact of individual-based maximum rufous band") +
-  scale_x_date(date_labels = "%B", 
-               expand = c(0.01, 0.01), 
-               date_breaks = "1 month") +
-  ggtitle("bird-specific slopes of\npre-basic moult timing (random)")
-
-# plot the model
-plot_rs_bird_fs_sex <- 
-  ggplot() +
-  geom_line(data = mod_moult_sex_bird_RIS_fits, 
-            aes(x = date, y = predicted, color = sex)) +
-  geom_ribbon(data = mod_moult_sex_bird_RIS_fits, 
-              aes(x = date, ymax = conf.high, ymin = conf.low, fill = sex),
-              lwd = 1, alpha = 0.25) +
-  geom_jitter(data = ind_prop_molt_scores,
-              aes(x = date, y = prop_molt_score, color = sex), 
-              alpha = 0.25, shape = 20, width = 0, height = 0.025) +
-  theme(legend.position = c(0.55, 0.1),
-        # legend.background = element_rect(fill = 'transparent', color = NA),
-        legend.justification = c(1, 0),
-        legend.title = element_blank(),
-        text = element_text(family = "Verdana"),
-        axis.ticks = element_blank(),
-        axis.text.x = element_text(size = 10, 
-                                   angle = 45, 
-                                   hjust = 1, 
-                                   vjust = 1,
-                                   colour = "grey40"),
-        axis.text.y = element_blank(),
-        axis.title.y = element_blank(),
-        plot.margin = unit(c(0.2,0.2,0.2,0.2), "cm"),
-        panel.spacing = unit(1, "cm"),
-        panel.background = element_rect(fill = 'transparent', color = NA),
-        plot.background = element_rect(fill = 'transparent', color = NA), 
-        panel.grid.major.y = element_line(size = 0.25, lineend = "round", colour = "grey90"),
-        panel.grid.minor = element_blank(),
-        panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90"),
-        axis.title.x = element_blank()) +
-  scale_y_continuous(limits = c(-0.05, 1.05)) +
-  ylab("proportion intact of individual-based maximum rufous band") +
-  scale_x_date(date_labels = "%B", 
-               expand = c(0.01, 0.01), 
-               date_breaks = "1 month") +
-  scale_colour_brewer(palette = "Dark2", direction = -1,
-                      name = "Sex",
-                      labels = c("Female (N = 49)", "Male (N = 32)")) +
-  scale_fill_brewer(palette = "Dark2", direction = -1,
-                    name = "Sex",
-                    labels = c("Female (N = 49)", "Male (N = 32)")) +
-  ggtitle("sex-specific slopes\nof pre-basic moult timing (fixed)")
-
-plot_rs_bird + plot_rs_bird_fs_sex 
-
-```
-
+mixed effects binomial model assessing sex-differences in the timing of pre-basic moult while accounting for bird- and year-specific random variation in the timing of pre-basic moult (i.e., random slope model of date for individual and year).
 ```{r}
 mod_moult_sex_bird_season_RIS <- 
-  lme4::glmer(prop_molt_score ~ 
+  lme4::glmer(prop_molt_score_mode ~ 
                 date_J + sex + 
          (date_J | rings_comb) + (date_J | season),
        data = ind_prop_molt_scores, 
-       family = binomial,
-       control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e+06)))
+       family = binomial)
 ```
 
-```{r}
+```{r, echo=FALSE}
+tbl_regression(mod_moult_sex_bird_season_RIS, intercept = TRUE, 
+               label = list(date_J ~ "Date", sex ~ "Sex"))
+```
+
+```{r, echo=FALSE}
 RIS_bird_season <- 
   augment(mod_moult_sex_bird_season_RIS) %>% 
-  dplyr::select(prop_molt_score, date_J, rings_comb, season, .fitted, sex)
+  dplyr::select(prop_molt_score_mode, date_J, rings_comb, season, .fitted, sex)
+
+dates_for_plot <-
+  data.frame(date = as.Date(c(as.Date("2021-07-01"):as.Date("2022-06-30"))),
+             date_J = c(1:365))
 
 df_bird_season <- 
   RIS_bird_season %>% 
@@ -1620,12 +1398,26 @@ mod_moult_sex_bird_season_RIS_fits <-
   left_join(., dates_for_plot, by = "date_J") %>% 
   filter(date > as.Date("2021-11-01"))
 
-plot_rs_bird <-
-  ggplot(data = df_bird_season, 
+plot_rs_bird_season <-
+  ggplot() + 
+  geom_line(data = df_bird_season, 
          aes(x = date, y = RIS_trans, 
-             colour = rings_comb, 
-             group = bird_season)) + 
-  geom_line() +
+             group = bird_season), 
+         alpha = 0.25, colour = "grey50") +
+  # geom_line(data = df_bird_season %>% filter(rings_comb == "RRGO"), #"RBRL"),
+  #           aes(x = date, y = RIS_trans,
+  #            group = bird_season),
+  #        alpha = 1, colour = "black") +
+  # geom_jitter(data = mid_point_moult_df,
+  #             aes(x = date, y = 0.75),
+  #             height = 0.025, color = "red") +
+  # geom_jitter(data = moult_commence_ring_season,
+  #             aes(x = date, y = 0.25),
+  #             height = 0.025, color = "blue") +
+  # geom_point(data = mid_point_moult_df %>% filter(rings_comb == "RRGO"),
+  #            aes(x = date, y = 0.55)) +
+  # geom_point(data = moult_commence_ring_season %>% filter(rings_comb == "RRGO"),
+  #            aes(x = date, y = 0.45)) +
   theme(legend.position = "none",
         legend.justification = c(1, 0),
         legend.title = element_blank(),
@@ -1660,8 +1452,9 @@ plot_rs_bird_season_fs_sex <-
   geom_ribbon(data = mod_moult_sex_bird_season_RIS_fits, 
               aes(x = date, ymax = conf.high, ymin = conf.low, fill = sex),
               lwd = 1, alpha = 0.25) +
-  geom_jitter(data = ind_prop_molt_scores,
-              aes(x = date, y = prop_molt_score, color = sex), 
+  geom_jitter(data = ind_prop_molt_scores %>% 
+                left_join(., dates_for_plot, by = "date_J"),
+              aes(x = date, y = prop_molt_score_mode, color = sex), 
               alpha = 0.25, shape = 20, width = 0, height = 0.025) +
   theme(legend.position = c(0.55, 0.1),
         # legend.background = element_rect(fill = 'transparent', color = NA),
@@ -1697,238 +1490,161 @@ plot_rs_bird_season_fs_sex <-
                     labels = c("Female (N = 49)", "Male (N = 32)")) +
   ggtitle("sex-specific slopes\nof pre-basic moult timing (fixed)")
 
-plot_rs_bird + plot_rs_bird_fs_sex 
-
+plot_rs_bird_season + plot_rs_bird_season_fs_sex 
 ```
 
 ```{r, include=FALSE, eval=FALSE}
-mod_moult_sex_bird_season_RIS <- 
-  lme4::glmer(prop_molt_score ~ 
-                date_J + sex + 
-         (date_J | rings_comb) + (date_J | season),
-       data = ind_prop_molt_scores, 
-       family = binomial,
-       control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e+06)))
-
 # quick look at effect
 plot(allEffects(mod_moult_sex_bird_season_RIS), type = "response")
 tbl_regression(mod_moult_sex_bird_season_RIS)
 
+# not much variation in slopes across seasons, so simplify the model to only include the (date_J | rings_comb) term.
+mod_moult_sex_bird_RIS <- 
+  lme4::glmer(prop_molt_score ~ 
+                date_J + sex + 
+         (date_J | rings_comb),
+       data = ind_prop_molt_scores, 
+       family = binomial)
+
+tab_model(mod_moult_sex_bird_RIS)
+
+# Load the package
+library(performance)
+
+# Calculate R-squared
+r2(mod_moult_sex_bird_RIS)
+
+# Load the package
+library(MuMIn)
+
+# Calculate R-squared
+r.squaredGLMM(mod_moult_sex_bird_RIS)
+
 # Derive confidence intervals of effect sizes from parametric bootstrapping
-tidy_mod_moult_sex_bird_season_RIS <-
-  tidy(mod_moult_sex_bird_season_RIS, conf.int = TRUE)
+tidy_mod_moult_sex_bird_RIS <-
+  tidy(mod_moult_sex_bird_RIS, conf.int = TRUE, conf.method = "boot", nsim = 1000)
 
-# run rptR to obtain repeatabilities of random effects
-rpt_mod_moult_sex <-
-  rpt(prop_molt_score ~ date_J + sex + 
-         (date_J | rings_comb) + (date_J | season),
-      grname = c("rings_comb", "season", "Fixed"),
-      data = ind_prop_molt_scores,
-      datatype = "Binary",
-      nboot = 1000, npermut = 1000, ratio = TRUE,
-      adjusted = TRUE, ncores = 4, parallel = TRUE)
-
-# run partR2 on each model to obtain marginal R2, parameter estimates, and beta
-# weights
-R2m_mod_moult_sex_bird_season_RIS <-
-  partR2(mod_moult_sex_bird_season_RIS,
-         partvars = c("date_J", "sex"),
-         R2_type = "marginal",
-         nboot = 1000,
-         CI = 0.95,
-         max_level = 1)
-
-R2c_mod_moult_sex_bird_season_RIS <-
-  partR2(mod_moult_sex_bird_season_RIS,
-         partvars = c("date_J", "sex"),
-         R2_type = "conditional",
-         nboot = 1000,
-         CI = 0.95,
-         max_level = 1)
-
-stats_mod_moult_sex <-
-  list(mod = mod_moult_sex,
-       tidy = tidy_mod_moult_sex,
-       rptR = rpt_mod_moult_sex,
-       partR2m = R2m_mod_moult_sex,
-       partR2c = R2c_mod_moult_sex,
-       data = ind_prop_molt_scores)
+saveRDS(tidy_mod_moult_sex_bird_RIS, here("out/tidy_mod_moult_sex_bird_RIS.rds"))
 ```
 
 ```{r, include=FALSE}
-# saveRDS(stats_mod_moult_sex, file = "out/stats_mod_moult_sex.rds")
-stats_mod_moult_sex <- readRDS(file = "/Users/luketheduke2/ownCloud/kemp_projects/bdot/moult/out/stats_mod_moult_sex.rds")
-```
+# derive the mid-point date of each individual's moult
 
-```{r, include=FALSE}
-#### Table of effect sizes ----
-# Retrieve sample sizes
-sample_sizes <-
-  ind_breeding_scores %>% 
-  ungroup() %>% 
-  summarise(Year = n_distinct(season),
-            Individual = n_distinct(rings_comb),
-            Observations = nrow(.))
+# wrangle the dates of plumage retention and moult for subsequent analysis
+# Step 1: Calculate the max_score for each individual and season
+mode_scores <- ind_prop_molt_scores %>%
+  group_by(rings_comb, season) %>%
+  summarise(mode_score = max(prop_molt_score_mode, na.rm = TRUE), .groups = "drop")
 
-sample_sizes <- 
-  as.data.frame(t(as.data.frame(sample_sizes))) %>%
-  rownames_to_column("term") %>% 
-  rename(estimate = V1) %>% 
-  mutate(stat = "n")
+# Step 2: Merge the max_scores back into the original data
+mid_point_dates <-
+  ind_prop_molt_scores %>%
+  left_join(mode_scores, by = c("rings_comb", "season")) %>%  # Add the max_score
+  group_by(rings_comb, season) %>%
+  arrange(date_J) %>%  # Ensure data is sorted by date_J
 
-# clean model component names
-mod_comp_names <- 
-  data.frame(comp_name = c("Male (Sex)",
-                           "Total Marginal \U1D479\U00B2",
-                           "Sex",
-                           "Total Conditional \U1D479\U00B2",
-                           "Individual",
-                           "Year",
-                           "Residual",
-                           "Individual",
-                           "Year",
-                           "Residual",
-                           "Years",
-                           "Individuals",
-                           "Observations"))
+  # Step 3: Find the latest date_J for the maximum prop_molt_score
+  filter(prop_molt_score_mode == mode_score) %>%
+  slice_max(order_by = date_J, n = 1, with_ties = FALSE) %>%
+  rename(latest_mode_date_J = date_J) %>%
 
-# Fixed effect sizes (non-standardized)
-fixefTable <- 
-  stats_mod_moult_sex$tidy %>% 
-  dplyr::filter(effect == "fixed") %>% 
-  dplyr::select(term, estimate, conf.low, conf.high) %>% 
-  as.data.frame() %>% 
-  mutate(stat = "fixed")
+  # Step 4: Find the earliest date_J where prop_molt_score < max_score
+  right_join(
+    ind_prop_molt_scores %>%
+      left_join(mode_scores, by = c("rings_comb", "season")) %>%  # Add the max_score here too
+      group_by(rings_comb, season) %>%
+      arrange(date_J) %>%
+      filter(prop_molt_score_mode < mode_score) %>%
+      slice_min(order_by = date_J, n = 1, with_ties = FALSE) %>%
+      rename(earliest_decline_date_J = date_J),
+    by = c("rings_comb", "season")
+  ) %>%
 
-# Fixed effect sizes (standardized)
-fixef_bw_Table <- 
-  stats_mod_moult_sex$partR2m$BW %>% 
-  as.data.frame() %>% 
-  mutate(stat = "fixed_bw") %>% 
-  rename(conf.low = CI_lower,
-         conf.high = CI_upper)
+  # Step 5: Compute the mid-point date_J
+  mutate(mid_point_date_J = round((latest_mode_date_J + earliest_decline_date_J) / 2)) %>%
 
-# Semi-partial R2 estimates
-R2Table <- 
-  bind_rows(stats_mod_moult_sex$partR2m$R2,
-            stats_mod_moult_sex$partR2c$R2[1,]) %>% 
-  dplyr::select(term, estimate, CI_lower, CI_upper) %>% 
-  as.data.frame() %>% 
-  mutate(stat = "partR2") %>% 
-  rename(conf.low = CI_lower,
-         conf.high = CI_upper)
+  # Select relevant columns
+  select(rings_comb, season, latest_mode_date_J, earliest_decline_date_J, mid_point_date_J) %>%
+  distinct()
 
-# Random effects variances
-ranefTable <- 
-  stats_mod_moult_sex$tidy %>% 
-  dplyr::filter(effect == "ran_pars") %>% 
-  dplyr::select(group, estimate, conf.low, conf.high) %>% 
-  as.data.frame() %>% 
-  mutate(stat = "rand") %>% 
-  rename(term = group) %>% 
-  mutate(estimate = estimate^2,
-         conf.high = conf.high^2,
-         conf.low = conf.low^2)
-
-# Adjusted repeatabilities
-coefRptTable <- 
-  stats_mod_moult_sex$rptR$R_boot %>% 
-  dplyr::select(-Fixed) %>% 
-  mutate(residual = 1 - rowSums(.)) %>% 
-  apply(., 2, 
-        function(x) c(mean (x), quantile (x, prob = c(0.025, 0.975)))) %>% 
-  t() %>% 
-  as.data.frame() %>% 
-  rownames_to_column("term") %>% 
-  rename(estimate = V1,
-         conf.low = `2.5%`,
-         conf.high = `97.5%`) %>% 
-  mutate(stat = "RptR")
-
-# Store all parameters into a single table and clean it up
-allCoefs_mod <- 
-  bind_rows(fixef_bw_Table,
-            R2Table,
-            ranefTable, 
-            coefRptTable, 
-            sample_sizes) %>% 
-  bind_cols(.,
-            mod_comp_names) %>%
-  mutate(coefString = ifelse(!is.na(conf.low),
-                             paste0("[", 
-                                    round(conf.low, 2), ", ", 
-                                    round(conf.high, 2), "]"),
-                             NA),
-         effect = c(rep("Fixed effects \U1D6FD (standardized)", nrow(fixef_bw_Table)),
-                    rep("Partitioned \U1D479\U00B2", nrow(R2Table)),
-                    rep("Random effects \U1D70E\U00B2", nrow(ranefTable)),
-                    rep("Adjusted repeatability \U1D45F", nrow(coefRptTable)),
-                    rep("Sample sizes \U1D45B", nrow(sample_sizes)))) %>%
-  dplyr::select(effect, everything())
-
-# draw gt table
-mod_moult_sex_table <- 
-  allCoefs_mod %>% 
-  dplyr::select(effect, comp_name, estimate, coefString) %>% 
-  gt(rowname_col = "row",
-     groupname_col = "effect") %>% 
-  cols_label(comp_name = html("<i>Banded Dotterel pre-basic moult</i>"),
-             estimate = "Mean estimate",
-             coefString = "95% confidence interval") %>% 
-  fmt_number(columns = c(estimate),
-             rows = 1:10,
-             decimals = 2,
-             use_seps = FALSE) %>% 
-  fmt_number(columns = c(estimate),
-             rows = 11:13,
-             decimals = 0,
-             use_seps = FALSE) %>% 
-  sub_missing(columns = 1:4,
-              missing_text = "") %>% 
-  cols_align(align = "left",
-             columns = c(comp_name)) %>% 
-  tab_options(row_group.font.weight = "bold",
-              row_group.background.color = brewer.pal(9,"Greys")[3],
-              table.font.size = 12,
-              data_row.padding = 3,
-              row_group.padding = 4,
-              summary_row.padding = 2,
-              column_labels.font.size = 14,
-              row_group.font.size = 12,
-              table.width = pct(100))
-```
-
-```{r, include=FALSE, eval=FALSE}
-# extract predicted trends
-pr <- ggeffects::predict_response(mod_moult_sex, c("date_J [30:293]", "sex"))
-
-# back-transform the dates (i.e., Julian dates were optimized for Austral summer), note that the year is irrelevent here and is only kept for simplicity. We are mainly interested in matching the month and day part of the date string with the transformed Julian date
 dates_for_plot <-
   data.frame(date = as.Date(c(as.Date("2021-07-01"):as.Date("2022-06-30"))),
              date_J = c(1:365))
 
+moult_commence_ring_season <-
+  left_join(mid_point_dates,
+            dates_for_plot %>% rename(mid_point_date_J = date_J),
+            by = "mid_point_date_J") %>% 
+  mutate(season = as.factor(season))
+```
+
+### Within-individual moult dynamics across migratory status
+```{r, include=FALSE}
+# calculate the individual proportional moult scores by comparing each score to a given individual's max (determined in previous chunk). Piece apart variation in migratory status.
+ind_prop_molt_scores_status <- 
+  ind_prop_molt_scores %>% 
+  filter(migratory_status %in% c("R", "M"))
+```
+
+```{r, echo=FALSE}
+# Assess sample sizes of each migratory status
+ind_prop_molt_scores_status %>% 
+  group_by(migratory_status) %>% 
+  summarise(n_distinct(rings_comb))
+```
+
+```{r}
+# mixed effects binomial model comparing migratory status and date effect on the changes in moult scores
+mod_moult_status_bird_RIS <- 
+  lme4::glmer(prop_molt_score_mode ~ 
+                date_J + migratory_status +
+         (date_J | rings_comb),
+       data = ind_prop_molt_scores_status, 
+       family = binomial,
+       control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e+06)))
+```
+
+```{r, echo=FALSE}
+tbl_regression(mod_moult_status_bird_RIS, intercept = TRUE, 
+               label = list(date_J ~ "Date", migratory_status ~ "Migratory status"))
+```
+
+```{r, echo=FALSE}
+RIS_bird_status <- 
+  augment(mod_moult_status_bird_RIS) %>% 
+  dplyr::select(prop_molt_score_mode, date_J, rings_comb, .fitted, migratory_status)
+
+dates_for_plot <-
+  data.frame(date = as.Date(c(as.Date("2021-07-01"):as.Date("2022-06-30"))),
+             date_J = c(1:365))
+
+df_bird_status <- 
+  RIS_bird_status %>% 
+  dplyr::group_by(migratory_status, rings_comb, date_J) %>% 
+  dplyr::summarise(RIS = mean(.fitted)) %>% 
+  mutate(RIS_trans = exp(RIS)/(1 + exp(RIS))) %>% 
+  left_join(., dates_for_plot, by = "date_J") %>% 
+  mutate(rings_comb = as.factor(rings_comb)) %>% 
+  filter(date > as.Date("2021-11-01"))
+
+# extract predicted trends
+pr <- ggeffects::predict_response(mod_moult_status_bird_RIS, c("date_J [30:293]", "migratory_status"))
+
 # join the back-transformed dates to model fits
-mod_moult_sex_fits <- 
+mod_moult_status_bird_RIS_fits <- 
   as.data.frame(pr) %>% 
   rename(date_J = x,
-         sex = group) %>% 
-  left_join(., dates_for_plot, by = "date_J")
+         migratory_status = group) %>% 
+  left_join(., dates_for_plot, by = "date_J") %>% 
+  filter(date > as.Date("2021-11-01"))
 
-ind_prop_molt_scores <- 
-  ind_prop_molt_scores %>% 
-  left_join(., dates_for_plot, by = "date_J")
-
-# plot the model
-ggplot() +
-  geom_line(data = mod_moult_sex_fits, 
-            aes(x = date, y = predicted, color = sex)) +
-  geom_ribbon(data = mod_moult_sex_fits, 
-              aes(x = date, ymax = conf.high, ymin = conf.low, fill = sex),
-              lwd = 1, alpha = 0.25) +
-  geom_jitter(data = ind_prop_molt_scores,
-              aes(x = date, y = prop_molt_score, color = sex), 
-              alpha = 0.25, shape = 20, width = 0, height = 0.025) +
-  theme(legend.position = c(0.3, 0.2),
+plot_rs_bird_status <-
+  ggplot() + 
+  geom_line(data = df_bird_status, 
+         aes(x = date, y = RIS_trans, 
+             group = rings_comb), 
+         alpha = 0.25, colour = "grey50") +
+  theme(legend.position = "none",
         legend.justification = c(1, 0),
         legend.title = element_blank(),
         text = element_text(family = "Verdana"),
@@ -1947,138 +1663,38 @@ ggplot() +
         panel.grid.minor = element_blank(),
         panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90"),
         axis.title.x = element_blank()) +
+  scale_y_continuous(limits = c(-0.05, 1.05)) +
   ylab("proportion intact of individual-based maximum rufous band") +
   scale_x_date(date_labels = "%B", 
                expand = c(0.01, 0.01), 
                date_breaks = "1 month") +
-  scale_colour_brewer(palette = "Dark2", direction = -1,
-                      name = "Sex",
-                      labels = c("Female (N = 49)", "Male (N = 32)")) +
-  scale_fill_brewer(palette = "Dark2", direction = -1,
-                    name = "Sex",
-                    labels = c("Female (N = 49)", "Male (N = 32)"))
-```
-
-```{r}
-# wrangle the dates of plumage retention and moult for subsequent analysis
-# Step 1: Calculate the max_score for each individual and season
-max_scores <- ind_prop_molt_scores %>%
-  group_by(rings_comb, season) %>%
-  summarise(max_score = max(prop_molt_score, na.rm = TRUE), .groups = "drop")
-
-# Step 2: Merge the max_scores back into the original data
-mid_point_dates <- 
-  ind_prop_molt_scores %>%
-  left_join(max_scores, by = c("rings_comb", "season")) %>%  # Add the max_score
-  group_by(rings_comb, season) %>%
-  arrange(date_J) %>%  # Ensure data is sorted by date_J
-
-  # Step 3: Find the latest date_J for the maximum prop_molt_score
-  filter(prop_molt_score == max_score) %>%
-  slice_max(order_by = date_J, n = 1, with_ties = FALSE) %>%
-  rename(latest_max_date_J = date_J) %>%
-  
-  # Step 4: Find the earliest date_J where prop_molt_score < max_score
-  right_join(
-    ind_prop_molt_scores %>%
-      left_join(max_scores, by = c("rings_comb", "season")) %>%  # Add the max_score here too
-      group_by(rings_comb, season) %>%
-      arrange(date_J) %>%
-      filter(prop_molt_score < max_score) %>%
-      slice_min(order_by = date_J, n = 1, with_ties = FALSE) %>%
-      rename(earliest_decline_date_J = date_J),
-    by = c("rings_comb", "season")
-  ) %>%
-  
-  # Step 5: Compute the mid-point date_J
-  mutate(mid_point_date_J = round((latest_max_date_J + earliest_decline_date_J) / 2)) %>%
-  
-  # Select relevant columns
-  select(rings_comb, season, latest_max_date_J, earliest_decline_date_J, mid_point_date_J) %>%
-  distinct()
-
-dates_for_plot <-
-  data.frame(date = as.Date(c(as.Date("2021-07-01"):as.Date("2022-06-30"))),
-             date_J = c(1:365))
-
-moult_commence_ring_season <- 
-  left_join(mid_point_dates, 
-            dates_for_plot %>% rename(mid_point_date_J = date_J), 
-            by = "mid_point_date_J")
-```
-
-### Within-individual moult dynamics across migratory status
-```{r}
-# calculate the individual proportional moult scores by comparing each score to a given individual's max (determined in previous chunk). Piece apart variation in migratory status.
-ind_prop_molt_scores <- 
-  dat %>% 
-  mutate(score = as.numeric(score)) %>% 
-  left_join(., select(ind_breeding_scores, -sex), by = c("rings_comb","season")) %>% 
-  filter(!is.na(max_breeding_score)) %>% 
-  mutate(prop_molt_score = (score-1)/(max_breeding_score-1)) %>%
-  select(rings_comb, season, date_J, sex, migratory_status, score, max_breeding_score, prop_molt_score) %>% 
-  arrange(rings_comb, season, date_J) %>% 
-  distinct() %>% 
-  filter(!is.na(prop_molt_score)) %>% 
-  filter(migratory_status %in% c("R", "M"))
-
-# Assess sample sizes of each migratory status
-ind_prop_molt_scores %>% 
-  group_by(migratory_status) %>% 
-  summarise(n_distinct(rings_comb))
-
-# mixed effects binomial model comparing migratory status and date effect on the changes in moult scores
-mod1_status <- 
-  lme4::glmer(prop_molt_score ~ 
-                date_J * migratory_status +
-         (1 | rings_comb),
-       data = ind_prop_molt_scores, 
-       family = binomial,
-       control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e+06)))
-
-# strong date effect, but no status effect
-tbl_regression(mod1_status, intercept = TRUE, 
-               label = list(date_J ~ "Date", migratory_status ~ "Migratory status"))
-
-# extract predicted trends
-pr <- ggeffects::predict_response(mod1_status, c("date_J [30:293]", "migratory_status"))
-
-# back-transform the dates (i.e., Julian dates were optimized for Austral summer), note that the year is irrelevent here and is only kept for simplicity. We are mainly interested in matching the month and day part of the date string with the transformed Julian date
-dates_for_plot <-
-  data.frame(date = as.Date(c(as.Date("2021-07-01"):as.Date("2022-06-30"))),
-             date_J = c(1:365))
-
-# join the back-transformed dates to model fits
-mod1_fits <- 
-  as.data.frame(pr) %>% 
-  rename(date_J = x,
-         migratory_status = group) %>% 
-  left_join(., dates_for_plot, by = "date_J")
-
-ind_prop_molt_scores <- 
-  ind_prop_molt_scores %>% 
-  left_join(., dates_for_plot, by = "date_J")
+  ggtitle("bird-specific slopes of\npre-basic moult timing (random)")
 
 # plot the model
-ggplot() +
-  geom_line(data = mod1_fits, 
+plot_rs_bird_status_fs <- 
+  ggplot() +
+  geom_line(data = mod_moult_status_bird_RIS_fits,
             aes(x = date, y = predicted, color = migratory_status)) +
-  geom_ribbon(data = mod1_fits, 
+  geom_ribbon(data = mod_moult_status_bird_RIS_fits,
               aes(x = date, ymax = conf.high, ymin = conf.low, fill = migratory_status),
               lwd = 1, alpha = 0.25) +
-  geom_jitter(data = ind_prop_molt_scores,
-              aes(x = date, y = prop_molt_score, color = migratory_status), 
+  geom_jitter(data = ind_prop_molt_scores_status %>%
+                left_join(., dates_for_plot, by = "date_J"),
+              aes(x = date, y = prop_molt_score_mode, color = migratory_status),
               alpha = 0.25, shape = 20, width = 0, height = 0.025) +
-  theme(legend.position = c(0.3, 0.2),
+  theme(legend.position = c(0.55, 0.1),
+        # legend.background = element_rect(fill = 'transparent', color = NA),
         legend.justification = c(1, 0),
+        legend.title = element_blank(),
         text = element_text(family = "Verdana"),
         axis.ticks = element_blank(),
         axis.text.x = element_text(size = 10, 
                                    angle = 45, 
                                    hjust = 1, 
-                                   vjust = 1),
-        axis.text.y = element_text(size = 10, colour = "grey40"),
-        axis.title.y = element_text(size = 11, colour = "grey40"),
+                                   vjust = 1,
+                                   colour = "grey40"),
+        axis.text.y = element_blank(),
+        axis.title.y = element_blank(),
         plot.margin = unit(c(0.2,0.2,0.2,0.2), "cm"),
         panel.spacing = unit(1, "cm"),
         panel.background = element_rect(fill = 'transparent', color = NA),
@@ -2087,85 +1703,90 @@ ggplot() +
         panel.grid.minor = element_blank(),
         panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90"),
         axis.title.x = element_blank()) +
+  scale_y_continuous(limits = c(-0.05, 1.05)) +
   ylab("proportion intact of individual-based maximum rufous band") +
   scale_x_date(date_labels = "%B", 
                expand = c(0.01, 0.01), 
                date_breaks = "1 month") +
-  scale_colour_brewer(palette = "Set1", direction = -1,
-                      name = "Migratory status",
-                      labels = c("Resident (N = 16)", "Migratory (N = 5)")) +
-  scale_fill_brewer(palette = "Set1", direction = -1,
-                    name = "Migratory status",
-                      labels = c("Resident (N = 16)", "Migratory (N = 5)"))
+  scale_colour_brewer(palette = "Set1",
+                    labels = c("Migrant (N = 5)", "Resident (N = 16)")) +
+  scale_fill_brewer(palette = "Set1",
+                    labels = c("Migrant (N = 5)", "Resident (N = 16)")) +
+  ggtitle("status-specific slopes\nof pre-basic moult timing (fixed)")
+
+plot_rs_bird_status + plot_rs_bird_status_fs
 ```
 
 ### Within-individual moult dynamics across ages
-```{r}
+```{r, include=FALSE}
 # calculate the individual proportional moult scores by comparing each score to a given individual's max (determined in previous chunk). Piece apart variation between age groups.
-ind_prop_molt_scores <- 
-  dat %>% 
-  mutate(score = as.numeric(score)) %>% 
-  left_join(., select(ind_breeding_scores, -sex), by = c("rings_comb","season")) %>% 
-  filter(!is.na(max_breeding_score)) %>% 
-  mutate(prop_molt_score = (score-1)/(max_breeding_score-1)) %>%
-  select(rings_comb, season, date_J, sex, age, score, max_breeding_score, prop_molt_score) %>% 
-  arrange(rings_comb, season, date_J) %>% 
-  distinct() %>% 
-  filter(!is.na(prop_molt_score)) %>% 
+ind_prop_molt_scores_age <- 
+  ind_prop_molt_scores %>% 
   filter(!is.na(age))
+```
 
+```{r, echo=FALSE}
 # Assess sample sizes of each sex
-ind_prop_molt_scores %>% 
+ind_prop_molt_scores_age %>% 
   group_by(age) %>% 
   summarise(n_distinct(rings_comb))
+```
 
-# mixed effects binomial model comparing sex and date effect on the changes in moult scores
-mod1_age <- 
-  lme4::glmer(prop_molt_score ~ 
+```{r}
+# mixed effects binomial model comparing migratory status and date effect on the changes in moult scores
+mod_moult_age_bird_RIS <- 
+  lme4::glmer(prop_molt_score_mode ~ 
                 date_J + age +
-         # date_J * sex +
-         (1 | rings_comb),# + (1 | season),
-       data = ind_prop_molt_scores, 
-       family = binomial)#,
-       # control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e+06)))
+         (date_J | rings_comb),
+       data = ind_prop_molt_scores_age, 
+       family = binomial,
+       control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e+06)))
+```
 
-plot(allEffects(mod1_age))
 
-# strong date effect, but no status effect
-tbl_regression(mod1_age, intercept = TRUE, 
+```{r,echo=FALSE}
+tbl_regression(mod_moult_age_bird_RIS, intercept = TRUE, 
                label = list(date_J ~ "Date", age ~ "Age"))
+```
 
-# extract predicted trends
-pr <- ggeffects::predict_response(mod1_age, c("date_J [30:293]", "age"))
+```{r, echo=FALSE}
+RIS_bird_age <- 
+  augment(mod_moult_age_bird_RIS) %>% 
+  dplyr::select(prop_molt_score_mode, date_J, rings_comb, .fitted, age)
 
-# back-transform the dates (i.e., Julian dates were optimized for Austral summer), note that the year is irrelevent here and is only kept for simplicity. We are mainly interested in matching the month and day part of the date string with the transformed Julian date
 dates_for_plot <-
   data.frame(date = as.Date(c(as.Date("2021-07-01"):as.Date("2022-06-30"))),
              date_J = c(1:365))
 
+df_bird_age <- 
+  RIS_bird_age %>% 
+  dplyr::group_by(age, rings_comb, date_J) %>% 
+  dplyr::summarise(RIS = mean(.fitted)) %>% 
+  mutate(RIS_trans = exp(RIS)/(1 + exp(RIS))) %>% 
+  left_join(., dates_for_plot, by = "date_J") %>% 
+  mutate(rings_comb = as.factor(rings_comb)) %>% 
+  filter(date > as.Date("2021-11-01"))
+
+# extract predicted trends
+pr <- ggeffects::predict_response(mod_moult_age_bird_RIS, c("date_J [30:293]", "age"))
+
 # join the back-transformed dates to model fits
-mod1_fits <- 
+mod_moult_age_bird_RIS_fits <- 
   as.data.frame(pr) %>% 
   rename(date_J = x,
          age = group) %>% 
-  left_join(., dates_for_plot, by = "date_J")
+  left_join(., dates_for_plot, by = "date_J") %>% 
+  filter(date > as.Date("2021-11-01"))
 
-ind_prop_molt_scores <- 
-  ind_prop_molt_scores %>% 
-  left_join(., dates_for_plot, by = "date_J")
-
-# plot the model
-ggplot() +
-  geom_line(data = mod1_fits, 
-            aes(x = date, y = predicted, color = age)) +
-  geom_ribbon(data = mod1_fits, 
-              aes(x = date, ymax = conf.high, ymin = conf.low, fill = age),
-              lwd = 1, alpha = 0.25) +
-  geom_jitter(data = ind_prop_molt_scores,
-              aes(x = date, y = prop_molt_score, color = as.factor(age)),
-              alpha = 0.25, shape = 20, width = 0, height = 0.025) +
-  theme(legend.position = c(0.3, 0.2),
+plot_rs_bird_age <-
+  ggplot() + 
+  geom_line(data = df_bird_age, 
+         aes(x = date, y = RIS_trans, 
+             group = rings_comb), 
+         alpha = 0.25, colour = "grey50") +
+  theme(legend.position = "none",
         legend.justification = c(1, 0),
+        legend.title = element_blank(),
         text = element_text(family = "Verdana"),
         axis.ticks = element_blank(),
         axis.text.x = element_text(size = 10, 
@@ -2182,11 +1803,51 @@ ggplot() +
         panel.grid.minor = element_blank(),
         panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90"),
         axis.title.x = element_blank()) +
+  scale_y_continuous(limits = c(-0.05, 1.05)) +
   ylab("proportion intact of individual-based maximum rufous band") +
   scale_x_date(date_labels = "%B", 
                expand = c(0.01, 0.01), 
-               date_breaks = "1 month", 
-               limits = c(as.Date("2021-10-01"), as.Date("2022-05-01"))) +
+               date_breaks = "1 month") +
+  ggtitle("bird-specific slopes of\npre-basic moult timing (random)")
+
+# plot the model
+plot_rs_bird_age_fs <- 
+  ggplot() +
+  geom_line(data = mod_moult_age_bird_RIS_fits %>% mutate(age = as.factor(age)),
+            aes(x = date, y = predicted, color = age)) +
+  geom_ribbon(data = mod_moult_age_bird_RIS_fits %>% mutate(age = as.factor(age)),
+              aes(x = date, ymax = conf.high, ymin = conf.low, fill = age),
+              lwd = 1, alpha = 0.25) +
+  geom_jitter(data = ind_prop_molt_scores_age %>%
+                left_join(., dates_for_plot, by = "date_J") %>% mutate(age = as.factor(age)),
+              aes(x = date, y = prop_molt_score_mode, color = age),
+              alpha = 1, shape = 20, width = 0, height = 0.025) +
+  theme(legend.position = c(0.25, 0.1),
+        # legend.background = element_rect(fill = 'transparent', color = NA),
+        legend.justification = c(1, 0),
+        legend.title = element_blank(),
+        text = element_text(family = "Verdana"),
+        axis.ticks = element_blank(),
+        axis.text.x = element_text(size = 10, 
+                                   angle = 45, 
+                                   hjust = 1, 
+                                   vjust = 1,
+                                   colour = "grey40"),
+        axis.text.y = element_blank(),
+        axis.title.y = element_blank(),
+        plot.margin = unit(c(0.2,0.2,0.2,0.2), "cm"),
+        panel.spacing = unit(1, "cm"),
+        panel.background = element_rect(fill = 'transparent', color = NA),
+        plot.background = element_rect(fill = 'transparent', color = NA), 
+        panel.grid.major.y = element_line(size = 0.25, lineend = "round", colour = "grey90"),
+        panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90"),
+        axis.title.x = element_blank()) +
+  scale_y_continuous(limits = c(-0.05, 1.05)) +
+  ylab("proportion intact of individual-based maximum rufous band") +
+  scale_x_date(date_labels = "%B", 
+               expand = c(0.01, 0.01), 
+               date_breaks = "1 month") +
   scale_colour_brewer(palette = "Spectral", direction = -1,
                       name = "Age",
                       labels = c("1 (N = 6)", "2 (N = 5)", "3 (N = 12)", 
@@ -2194,11 +1855,14 @@ ggplot() +
   scale_fill_brewer(palette = "Spectral", direction = -1,
                     name = "Age",
                       labels = c("1 (N = 6)", "2 (N = 5)", "3 (N = 12)", 
-                                 "4 (N = 13", "5 (N = 4)", "6 (N = 2)"))
+                                 "4 (N = 13", "5 (N = 4)", "6 (N = 2)")) +
+  ggtitle("age-specific slopes\nof pre-basic moult timing (fixed)")
+
+plot_rs_bird_age + plot_rs_bird_age_fs
 ```
 
 ## Breeding status analysis
-```{r}
+```{r, include=FALSE}
 # explore datasets provided by Ted
 ## 2021 season
 # import and consolidate key columns
@@ -2253,14 +1917,17 @@ breeding_data_2021 <-
   filter(!is.na(parent)) %>% 
   filter(parent %in% (dat %>% filter(season == 2021) %>% pull(rings_comb) %>% unique())) %>%
   filter(nest_fate == "Occupied" | as.numeric(chicks) > 0) %>%
-  group_by(parent) %>%
-  arrange(desc(date)) %>%
-  slice(1) %>%
+  group_by(parent) %>% 
+  mutate(
+    first_date_breeding = date[which.min(date)],
+    last_date_breeding = date[which.max(date)]) %>%
+  # arrange(desc(date)) %>%
+  # slice(1) %>%
   ungroup() %>%
-  arrange(desc(date)) %>%
+  # arrange(desc(date)) %>%
   mutate(nest_id = sub("^([^[:space:]]+).*", "\\1", NestID)) %>%
-  rename(last_date_breeding = date) %>% 
-  select(parent, last_date_breeding, nest_id, OBJECTID)
+  # rename(last_date_breeding = date) %>% 
+  select(parent, first_date_breeding, last_date_breeding, nest_id, OBJECTID)
 
 # import and consolidate key columns
 breeding_data_2021_ <-
@@ -2286,13 +1953,17 @@ breeding_2021_final <- left_join(breeding_data_2021, breeding_data_2021_, by = "
                                ((!is.na(fail_date) & found_date < fail_date)), 1, 0)) %>% 
   group_by(parent) %>% 
   mutate(last_date_breeding_ = max(found_date, hatch_date, fail_date, na.rm = TRUE)) %>% 
+  mutate(first_date_breeding_ = min(found_date, hatch_date, fail_date, na.rm = TRUE)) %>% 
   mutate(days_diff = last_date_breeding_ - last_date_breeding) %>% 
+  mutate(days_diff = first_date_breeding_ - first_date_breeding) %>% 
   arrange(desc(days_diff)) %>% 
-  mutate(last_date_breeding_final = as.Date(ifelse(days_diff > 0, last_date_breeding + ceiling(days_diff/2), last_date_breeding))) %>% 
-  arrange(desc(last_date_breeding_final)) %>% 
-  select(parent, last_date_breeding_final) %>% 
+  mutate(last_date_breeding_final = as.Date(ifelse(days_diff > 0, last_date_breeding + ceiling(days_diff/2), last_date_breeding)),
+         first_date_breeding_final = as.Date(ifelse(days_diff > 0, first_date_breeding + ceiling(days_diff/2), first_date_breeding))) %>% 
+  # arrange(desc(last_date_breeding_final)) %>% 
+  select(parent, first_date_breeding_final, last_date_breeding_final) %>% 
   # specify the season as the first calender year
-  mutate(season = ifelse(month(last_date_breeding_final) < 7, year(last_date_breeding_final) - 1, year(last_date_breeding_final)))
+  mutate(season = ifelse(month(last_date_breeding_final) < 7, year(last_date_breeding_final) - 1, year(last_date_breeding_final))) %>% 
+  distinct()
 
 ###########
 
@@ -2327,14 +1998,17 @@ breeding_data_2022 <-
   filter(!is.na(parent)) %>% 
   filter(parent %in% (dat %>% filter(season == 2022) %>% pull(rings_comb) %>% unique())) %>%
   filter(nest_fate == "Occupied" | as.numeric(chicks) > 0) %>%
-  group_by(parent) %>%
-  arrange(desc(date)) %>%
-  slice(1) %>%
+  group_by(parent) %>% 
+  mutate(
+    first_date_breeding = date[which.min(date)],
+    last_date_breeding = date[which.max(date)]) %>%
+  # arrange(desc(date)) %>%
+  # slice(1) %>%
   ungroup() %>%
-  arrange(desc(date)) %>%
+  # arrange(desc(date)) %>%
   mutate(nest_id = sub("^([^[:space:]]+).*", "\\1", NestID)) %>%
-  rename(last_date_breeding = date) %>% 
-  select(parent, last_date_breeding, nest_id, OBJECTID)
+  # rename(last_date_breeding = date) %>% 
+  select(parent, first_date_breeding, last_date_breeding, nest_id, OBJECTID)
 
 # import and consolidate key columns
 breeding_data_2022_ <-
@@ -2358,15 +2032,19 @@ breeding_2022_final <- left_join(breeding_data_2022, breeding_data_2022_, by = "
                                ((!is.na(hatch_date) & found_date < hatch_date)) | 
                                ((!is.na(fail_date) & !is.na(hatch_date)) & hatch_date < fail_date) |
                                ((!is.na(fail_date) & found_date < fail_date)), 1, 0)) %>% 
-  group_by(parent) %>% 
+ group_by(parent) %>% 
   mutate(last_date_breeding_ = max(found_date, hatch_date, fail_date, na.rm = TRUE)) %>% 
+  mutate(first_date_breeding_ = min(found_date, hatch_date, fail_date, na.rm = TRUE)) %>% 
   mutate(days_diff = last_date_breeding_ - last_date_breeding) %>% 
+  mutate(days_diff = first_date_breeding_ - first_date_breeding) %>% 
   arrange(desc(days_diff)) %>% 
-  mutate(last_date_breeding_final = as.Date(ifelse(days_diff > 0, last_date_breeding + ceiling(days_diff/2), last_date_breeding))) %>% 
-  arrange(desc(last_date_breeding_final)) %>% 
-  select(parent, last_date_breeding_final) %>% 
+  mutate(last_date_breeding_final = as.Date(ifelse(days_diff > 0, last_date_breeding + ceiling(days_diff/2), last_date_breeding)),
+         first_date_breeding_final = as.Date(ifelse(days_diff > 0, first_date_breeding + ceiling(days_diff/2), first_date_breeding))) %>% 
+  # arrange(desc(last_date_breeding_final)) %>% 
+  select(parent, first_date_breeding_final, last_date_breeding_final) %>% 
   # specify the season as the first calender year
-  mutate(season = ifelse(month(last_date_breeding_final) < 7, year(last_date_breeding_final) - 1, year(last_date_breeding_final)))
+  mutate(season = ifelse(month(last_date_breeding_final) < 7, year(last_date_breeding_final) - 1, year(last_date_breeding_final))) %>% 
+  distinct()
 
 
 
@@ -2403,14 +2081,17 @@ breeding_data_2023 <-
   filter(!is.na(parent)) %>% 
   filter(parent %in% (dat %>% filter(season == 2023) %>% pull(rings_comb) %>% unique())) %>%
   filter(nest_fate == "Occupied" | as.numeric(chicks) > 0) %>%
-  group_by(parent) %>%
-  arrange(desc(date)) %>%
-  slice(1) %>%
+   group_by(parent) %>% 
+  mutate(
+    first_date_breeding = date[which.min(date)],
+    last_date_breeding = date[which.max(date)]) %>%
+  # arrange(desc(date)) %>%
+  # slice(1) %>%
   ungroup() %>%
-  arrange(desc(date)) %>%
+  # arrange(desc(date)) %>%
   mutate(nest_id = sub("^([^[:space:]]+).*", "\\1", NestID)) %>%
-  rename(last_date_breeding = date) %>% 
-  select(parent, last_date_breeding, nest_id, OBJECTID)
+  # rename(last_date_breeding = date) %>% 
+  select(parent, first_date_breeding, last_date_breeding, nest_id, OBJECTID)
 
 # import and consolidate key columns
 breeding_data_2023_ <-
@@ -2436,13 +2117,17 @@ breeding_2023_final <- left_join(breeding_data_2023, breeding_data_2023_, by = "
                                ((!is.na(fail_date) & found_date < fail_date)), 1, 0)) %>% 
   group_by(parent) %>% 
   mutate(last_date_breeding_ = max(found_date, hatch_date, fail_date, na.rm = TRUE)) %>% 
+  mutate(first_date_breeding_ = min(found_date, hatch_date, fail_date, na.rm = TRUE)) %>% 
   mutate(days_diff = last_date_breeding_ - last_date_breeding) %>% 
+  mutate(days_diff = first_date_breeding_ - first_date_breeding) %>% 
   arrange(desc(days_diff)) %>% 
-  mutate(last_date_breeding_final = as.Date(ifelse(days_diff > 0, last_date_breeding + ceiling(days_diff/2), last_date_breeding))) %>% 
-  arrange(desc(last_date_breeding_final)) %>% 
-  select(parent, last_date_breeding_final) %>% 
+  mutate(last_date_breeding_final = as.Date(ifelse(days_diff > 0, last_date_breeding + ceiling(days_diff/2), last_date_breeding)),
+         first_date_breeding_final = as.Date(ifelse(days_diff > 0, first_date_breeding + ceiling(days_diff/2), first_date_breeding))) %>% 
+  # arrange(desc(last_date_breeding_final)) %>% 
+  select(parent, first_date_breeding_final, last_date_breeding_final) %>% 
   # specify the season as the first calender year
-  mutate(season = ifelse(month(last_date_breeding_final) < 7, year(last_date_breeding_final) - 1, year(last_date_breeding_final)))
+  mutate(season = ifelse(month(last_date_breeding_final) < 7, year(last_date_breeding_final) - 1, year(last_date_breeding_final))) %>% 
+  distinct()
 
 
 # combine breeding data from the 3 seasons into one table
@@ -2450,164 +2135,139 @@ breeding_2023_final <- left_join(breeding_data_2023, breeding_data_2023_, by = "
 breeding_data_all <- bind_rows(breeding_2021_final,breeding_2022_final,breeding_2023_final) %>% 
   rename(rings_comb = parent) %>% 
   # change to Julian date shifted for the Southern Hemisphere (1 = July 1)
-  mutate(breeding_date_J = as.numeric(format(last_date_breeding_final + 181, "%j"))) %>% 
+  mutate(last_breeding_date_J = as.numeric(format(last_date_breeding_final + 181, "%j")),
+         first_breeding_date_J = as.numeric(format(first_date_breeding_final + 181, "%j"))) %>% 
   ungroup() %>% 
   # standardize the last breeding date by year
-  mutate(breeding_date_J_s = scale_by(breeding_date_J ~ season, ., scale = 0)) %>% 
+  mutate(last_breeding_date_J_s = scale_by(last_breeding_date_J ~ season, ., scale = 0),
+         first_breeding_date_J_s = scale_by(first_breeding_date_J ~ season, ., scale = 0)) %>% 
   # make the scaled date variable numeric class
-  mutate(breeding_date_J_snum = as.numeric(breeding_date_J_s))
+  mutate(last_breeding_date_J_snum = as.numeric(last_breeding_date_J_s),
+         first_breeding_date_J_snum = as.numeric(first_breeding_date_J_s))
 
 ```
 
 ### Relationships between breeding schedule and plumage
-```{r}
-ind_prop_molt_scores_breeding_date <-
-  dat %>% 
-  mutate(score = as.numeric(score)) %>% 
-  left_join(., select(ind_breeding_scores, -sex), by = c("rings_comb","season")) %>% 
-  filter(!is.na(max_breeding_score)) %>% 
-  mutate(prop_molt_score = (score-1)/(max_breeding_score-1)) %>%
-  select(rings_comb, season, date_J, sex, migratory_status, age, score, max_breeding_score, prop_molt_score) %>% 
-  arrange(rings_comb, season, date_J) %>% 
-  distinct() %>% 
-  filter(!is.na(prop_molt_score)) %>% 
+```{r, include=FALSE}
+ind_prop_molt_scores_last_breeding_date <-
+  ind_prop_molt_scores %>% 
   full_join(breeding_data_all, by = c("rings_comb", "season")) %>% 
-  mutate(date_diff = abs(breeding_date_J - date_J)) %>% 
+  mutate(date_diff = abs(last_breeding_date_J - date_J)) %>% 
   arrange(rings_comb, season, date_diff) %>% 
-  group_by(rings_comb, season) %>% slice(1) %>% filter(date_diff < 30) %>% 
-  dplyr::select(rings_comb, season, sex, breeding_date_J, breeding_date_J_snum, prop_molt_score, max_breeding_score, age) %>% 
+  group_by(rings_comb, season) %>% slice(1) %>% 
+  filter(date_diff < 28) %>% # duration of incubation (days)
+  dplyr::select(rings_comb, season, sex, last_breeding_date_J, last_breeding_date_J_snum, prop_molt_score_mode, mode_breeding_score, age, migratory_status) %>% 
   distinct() %>%
   group_by(sex) %>%
-  mutate(std_max_breeding_score = (max_breeding_score - mean(max_breeding_score, na.rm = TRUE)) / sd(max_breeding_score, na.rm = TRUE)) %>%
+  mutate(std_mode_breeding_score = (mode_breeding_score - mean(mode_breeding_score, na.rm = TRUE)) / sd(mode_breeding_score, na.rm = TRUE)) %>%
   ungroup() %>% 
-  mutate(breeding_date_J_s = scale(breeding_date_J)) %>% 
-  left_join(., moult_commence_ring_season, by = c("rings_comb", "season"))
+  left_join(., moult_commence_ring_season %>% mutate(season = as.numeric(as.character(season))), by = c("rings_comb", "season"))
+
+ind_prop_molt_scores_first_breeding_date <-
+  ind_prop_molt_scores %>% 
+  full_join(breeding_data_all, by = c("rings_comb", "season")) %>% 
+  mutate(date_diff = abs(first_breeding_date_J - date_J)) %>% 
+  arrange(rings_comb, season, date_diff) %>% 
+  group_by(rings_comb, season) %>% slice(1) %>% 
+  dplyr::select(rings_comb, season, sex, first_breeding_date_J, first_breeding_date_J_snum, prop_molt_score_mode, mode_breeding_score, age, migratory_status) %>% 
+  distinct() %>%
+  group_by(sex) %>%
+  mutate(std_mode_breeding_score = (mode_breeding_score - mean(mode_breeding_score, na.rm = TRUE)) / sd(mode_breeding_score, na.rm = TRUE)) %>%
+  ungroup() %>% 
+  left_join(., moult_commence_ring_season %>% mutate(season = as.numeric(as.character(season))), by = c("rings_comb", "season"))
 ```
 
 #### effect of breeding plumage score on prolonged breeding
 do individuals with a fuller breeding plumage (for their sex) breed later than the rest of the population? No effect
 ```{r}
-mod_max_score_breeding_date <- 
-  lme4::lmer(breeding_date_J_snum ~ 
-                 std_max_breeding_score +
-         (1 | rings_comb),
-       data = ind_prop_molt_scores_breeding_date)
+mod_mode_score_last_breeding_date <- 
+  lme4::lmer(last_breeding_date_J_snum ~ 
+                 std_mode_breeding_score +
+         (1 | rings_comb) + (1 | season),
+       data = ind_prop_molt_scores_last_breeding_date)
 
-tbl_regression(mod_max_score_breeding_date, intercept = TRUE)
-plot(allEffects(mod_max_score_breeding_date), type = "response")
+tbl_regression(mod_mode_score_last_breeding_date, intercept = TRUE)
+plot(allEffects(mod_mode_score_last_breeding_date), type = "response")
 ```
 
-#### effect of breeding plumage score on prolonged breeding
+#### effect of breeding plumage score on early breeding
+do individuals with a fuller breeding plumage (for their sex) breed earlier than the rest of the population? No effect
+```{r}
+mod_mode_score_first_breeding_date <- 
+  lme4::lmer(first_breeding_date_J_snum ~ 
+                 std_mode_breeding_score +
+         (1 | rings_comb) + (1 | season),
+       data = ind_prop_molt_scores_first_breeding_date)
+
+tbl_regression(mod_mode_score_first_breeding_date, intercept = TRUE)
+plot(allEffects(mod_mode_score_first_breeding_date), type = "response")
+```
+
+#### effect of prolonged breeding on breeding plumage score
 do individuals with a late breeding attempts tend to have a fuller breeding plumage? No effect
 ```{r}
-mod_breeding_date_max_score <- 
-  lme4::lmer(std_max_breeding_score ~ 
-                 breeding_date_J_snum +
-         (1 | rings_comb),
-       data = ind_prop_molt_scores_breeding_date)
+mod_last_breeding_date_mode_score <- 
+  lme4::lmer(std_mode_breeding_score ~ 
+                 last_breeding_date_J_snum +
+         (1 | rings_comb) + (1 | season),
+       data = ind_prop_molt_scores_last_breeding_date)
 
-summary(mod_max_score_breeding_date)
-plot(allEffects(mod_breeding_date_max_score), type = "response")
+tbl_regression(mod_last_breeding_date_mode_score, intercept = TRUE)
+plot(allEffects(mod_last_breeding_date_mode_score), type = "response")
 ```
 
 ### Relationships between breeding schedule and moult
 #### effect of prolonged breeding on moult
-do individuals with late breeding attempts have a delayed moult?
-Yes: individuals that breed later than the rest of the population in a given year tend to commence their complete/post-breeding moult later
+do individuals with late breeding attempts have a delayed moult? No effect
 ```{r}
-mod_breeding_date_prop_molt_mid <- 
-  lme4::lmer(mid_point_date_J ~ 
-                 breeding_date_J_snum +
-         (1 | rings_comb),
-       data = ind_prop_molt_scores_breeding_date)
+mod_last_breeding_date_prop_molt_mid <- 
+  lmer(mid_point_date_J ~ last_breeding_date_J_snum + 
+         (1 | rings_comb) + (1 | season),
+       data = ind_prop_molt_scores_last_breeding_date)
 
-tbl_regression(mod_breeding_date_prop_molt_mid, intercept = TRUE)
-plot(allEffects(mod_breeding_date_prop_molt_mid), type = "response")
+tbl_regression(mod_last_breeding_date_prop_molt_mid, intercept = TRUE)
+plot(allEffects(mod_last_breeding_date_prop_molt_mid), type = "response")
 ```
 
 #### effect of prolonged breeding on prolonged retention of full plumage
-do individuals with late breeding attempts retain their full breeding plumage longer?
-Yes: individuals that breed later than the rest of the population in a given year tend to retain their full breeding plumage longer 
+do individuals with late breeding attempts retain their full breeding plumage longer? No effect
 ```{r}
-mod_breeding_date_prop_molt_latest <- 
-  lm(latest_max_date_J ~ breeding_date_J_snum,
-       data = ind_prop_molt_scores_breeding_date)
+mod_last_breeding_date_prop_molt_latest <- 
+  lmer(latest_mode_date_J ~ last_breeding_date_J_snum + 
+         (1 | rings_comb) + (1 | season),
+       data = ind_prop_molt_scores_last_breeding_date)
 
-tbl_regression(mod_breeding_date_prop_molt_latest, intercept = TRUE)
-plot(allEffects(mod_breeding_date_prop_molt_latest), type = "response")
+tbl_regression(mod_last_breeding_date_prop_molt_latest, intercept = TRUE)
+plot(allEffects(mod_last_breeding_date_prop_molt_latest), type = "response")
 ```
 
-### Relationships between age and extended breeding period
+### Relationships between age and breeding phenology
+#### effect of age on prolonged breeding 
+do older individuals conclude their breeding season later? No
 ```{r}
-# wrangle data to get ages and dates of last breeding for each season of all 
-# birds available
-age_breeding_date <-
-  dat %>% 
-  select(rings_comb, season, age, sex) %>% 
-  full_join(breeding_data_all, by = c("rings_comb", "season")) %>% 
-  distinct()
-```
+mod_age_last_breeding_date <- 
+  lme4::lmer(last_breeding_date_J_snum ~ age +
+        (1 | rings_comb) + (1 | season),
+       data = ind_prop_molt_scores_last_breeding_date)
 
-#### effect of age on prolonged breeding season
-do older individuals conclude their breeding season later? No: there is strong evidence that younger individuals tend to have the latest breeding attempts in the population for a given year.
-```{r}
-mod_age_breeding_date <- 
-  lme4::lmer(breeding_date_J_snum ~ age +
-         (1 | rings_comb),
-       data = age_breeding_date)
+plot(allEffects(mod_age_last_breeding_date), type = "response")
 
-summary(mod_age_breeding_date)
-
-plot(allEffects(mod_age_breeding_date), type = "response")
-
-# strong date effect, but no status effect
-tbl_regression(mod_age_breeding_date, intercept = TRUE, 
+tbl_regression(mod_age_last_breeding_date, intercept = TRUE, 
                label = list(age ~ "Age"))
+```
 
-# extract predicted trends
-# I tried the whole range for the breeding timing (breeding_date_J [72:221]), but then decided to take some values with 20 days interval to visualize it better
-pr <- ggeffects::predict_response(mod_age_breeding_date, c("age"))
+#### effect of age on early breeding 
+do older individuals start breeding earlier? No
+```{r}
+mod_age_first_breeding_date <- 
+  lme4::lmer(first_breeding_date_J_snum ~ age +
+         (1 | rings_comb) + (1 | season),
+       data = ind_prop_molt_scores_first_breeding_date)
 
-dates_for_plot <-
-  data.frame(date = as.Date(c(as.Date("2021-07-01"):as.Date("2022-06-30"))),
-             breeding_date_ = c(1:365))
-CL_dates_for_plot <-
-  data.frame(conf.low_date = as.Date(c(as.Date("2021-07-01"):as.Date("2022-06-30"))),
-             conf.low_ = c(1:365))
-CH_dates_for_plot <-
-  data.frame(conf.high_date = as.Date(c(as.Date("2021-07-01"):as.Date("2022-06-30"))),
-             conf.high_ = c(1:365))
+plot(allEffects(mod_age_first_breeding_date), type = "response")
 
-# join the back-transformed dates to model fits
-mod1_fits <- 
-  as.data.frame(pr) %>% 
-  rename(age = x,
-         # sex = group,
-         breeding_date = predicted) %>% 
-  mutate(breeding_date_ = round(breeding_date),
-         conf.low_ = round(conf.low),
-         conf.high_ = round(conf.high)) %>% 
-  left_join(., dates_for_plot, by = "breeding_date_") %>% 
-  left_join(., CL_dates_for_plot, by = "conf.low_") %>% 
-  left_join(., CH_dates_for_plot, by = "conf.high_")
-  
-# plot the model
-ggplot() +
-  geom_line(data = mod1_fits, 
-            aes(x = age, y = date)) +
-  geom_ribbon(data = mod1_fits, 
-              aes(x = age, ymax = conf.high_date, ymin = conf.low_date),
-              lwd = 1, alpha = 0.25) +
-  luke_theme +
-  # theme(legend.position = c(0.3, 0.2),
-  #       legend.justification = c(1, 0),
-  #       strip.background = element_blank(),
-  #       axis.title.x = element_blank(),
-  #       axis.text.x = element_text(size = 10, 
-  #                                  angle = 45, 
-  #                                  hjust = 1, 
-  #                                  vjust = 1)) +
-  ylab("date of last breeding")
+tbl_regression(mod_age_first_breeding_date, intercept = TRUE, 
+               label = list(age ~ "Age"))
 ```
 ## Meeting notes:
 ### 13-Nov-24: Bart, Luke, and Bashar via zoom
