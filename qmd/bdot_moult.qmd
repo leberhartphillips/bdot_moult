@@ -307,7 +307,7 @@ dat %>%
 ```
 
 summarise the number of usable photos for each individual across the three seasons
-```{r, echo = FALSE}
+```{r, echo=FALSE}
 dat %>%
   group_by(rings_comb, season) %>% 
   summarise(n_photos = n()) %>% 
@@ -317,7 +317,7 @@ dat %>%
 ```
 
 the final dataset
-```{r, echo=FALSE}
+```{r, echo=TRUE}
 dat %>% 
   datatable(class = 'cell-border stripe', rownames = FALSE, filter = 'top')
 ```
