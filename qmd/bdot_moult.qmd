@@ -61,6 +61,7 @@ bibliography: references.bib
 ---
 ```{r, include=FALSE}
 knitr::opts_chunk$set(cache = TRUE)
+options(repos = c(CRAN = "https://cran.rstudio.com"))
 ```
 
 ```{r, message=FALSE, results='hide', warning=FALSE, cache=FALSE, include=FALSE}
@@ -168,32 +169,37 @@ get_mode <- function(x) {
 ```
 
 ## Main conclusions since last meeting in Nov, 2024
-#### Sex difference in maximum rufous band score (strong effect)
-Males have a more full and immaculate rufous breast band than females
+### Breeding plumage
+- Sex difference in maximum rufous band score (strong effect) [Go to Results](#sex-specific-differences-in-breeding-plumage)
+  - Males have a more full and immaculate rufous breast band than females
 
-#### No age effect on maximum rufous band score
+- No age effect on maximum rufous band score [Go to Results](#age-and-sex-specific-variation-in-breeding-plumage)
 
-#### Migratory-status difference in maximum rufous band score (weak, albiet significant effect)
-Residents of both sexes have slightly more full and immaculate rufous breast bands than migrants
+- Migratory-status difference in maximum rufous band score (weak, albiet significant effect) [Go to Results](#migratory-status-and-sex-specific-variation-in-breeding-plumage)
+  - Residents of both sexes have slightly more full and immaculate rufous breast bands than migrants
 
-#### No sex-specific timing of the pre-basic moult
+### Pre-basic moult
+- No sex-specific timing of the pre-basic moult [Go to Results](#within-individual-moult-dynamics-across-sexes)
 
-#### No migratory-status-specific timing of the pre-basic moult
+- No migratory-status-specific timing of the pre-basic moult [Go to Results](#within-individual-moult-dynamics-across-migratory-status)
 
-#### Age-specific timing of pre-basic moult (strong effect)
-younger birds initiate their pre-basic moult earlier than older birds
+- Age-specific timing of pre-basic moult (strong effect) [Go to Results](#within-individual-moult-dynamics-across-ages)
+  - younger birds initiate their pre-basic moult earlier than older birds
 
-#### No effect of maximum rufous band score on prolonged breeding
+### Links to breeding activity
+- No effect of maximum rufous band score on prolonged breeding [Go to Results](#effect-of-breeding-plumage-score-on-prolonged-breeding)
 
-#### No effect of maximum rufous band score on early breeding
+- No effect of maximum rufous band score on early breeding [Go to Results](#effect-of-breeding-plumage-score-on-early-breeding)
 
-#### No effect of prolonged breeding on maximum rufous band score
+- No effect of prolonged breeding on maximum rufous band score [Go to Results](#effect-of-prolonged-breeding-on-breeding-plumage-score)
 
-#### Positive relationship between the date when an individual was last seen with its maximum breeding plumage and the date when it was last observed breeding
+- No effect of prolonged breeding and timing of moult [Go to Results](#effect-of-prolonged-breeding-on-moult)
 
-#### No age effect on prolonged breeding
+- Positive relationship between the date when an individual was last seen with its maximum breeding plumage and the date when it was last observed breeding [Go to Results](#effect-of-prolonged-breeding-on-prolonged-retention-of-full-plumage)
 
-#### No age effect on early breeding
+- No age effect on prolonged breeding [Go to Results](#effect-of-age-on-prolonged-breeding)
+
+- No age effect on early breeding [Go to Results](#effect-of-age-on-early-breeding)
 
 ## Exploration of moult data extracted from photos
 
@@ -204,7 +210,7 @@ This dataset contains the scored moult data for all usable photos from the 2021-
 ```{r, include = FALSE}
 # import data with all columns as character (so that no auto-formatting is done by R)
 dat <- 
-  read.csv("/Users/luketheduke2/ownCloud/kemp_projects/bdot/moult/data/Dataset_Molt_Final - modified 7.11.2024.csv", colClasses = "character") %>% 
+  read.csv("/Users/leberhart/ownCloud/kemp_projects/bdot/moult/data/Dataset_Molt_Final - modified 7.11.2024.csv", colClasses = "character") %>% 
   mutate(Rings_comb = str_sub(Rings_comb, 1, 4)) %>% 
   rename_with(tolower) # convert all column headers to lowercase
 
@@ -230,7 +236,7 @@ dat <-
 
 # import sex, migratory status, and age at banding information
 dat_sexes <- 
-  read.csv("/Users/luketheduke2/ownCloud/kemp_projects/bdot/moult/data/sex_status_banding.csv", colClasses = "character") %>% 
+  read.csv("/Users/leberhart/ownCloud/kemp_projects/bdot/moult/data/sex_status_banding.csv", colClasses = "character") %>% 
   mutate(Rings_comb = str_sub(Rings_comb, 1, 4)) %>% 
   rename_with(tolower) %>% # convert all column headers to lowercase
   distinct()
@@ -326,10 +332,11 @@ dat %>%
 
 The "score" value is based on a scale from 1 to 7 describing the immaculate-ness and full-ness of the rufous breast band seen in the photos (@kok2020experimental)
 
-### `NOTE FOR BASHAR (26-01-2025)`: 
-`would be great to add a figure here showing example photos of an individual male and female over several phases of the moult. For example, two-columns with male on left, female on right, and 5 rows of images starting with their fullest and most immaculate state and ending with their basic plumage. Would be useful to show the scores you gave for these individuals in the figure. Based on the data, it seems like Male "RRGO" and Female "RWBB" would be a good candidates given that they recieved a wide range of scores`
+```{r, echo=FALSE}
+knitr::include_graphics("/Users/leberhart/ownCloud/kemp_projects/bdot/moult/figs/combined_figure_draft.png")
+```
 
-```{r}
+```{r, include=FALSE}
 dat %>% 
   select(sex, rings_comb, season, score, date) %>% 
   group_by(sex, rings_comb, season) %>% 
@@ -580,7 +587,7 @@ stats_mod_max_score <-
 
 ```{r, include=FALSE}
 # saveRDS(stats_mod_max_score, file = "out/stats_mod_max_score.rds")
-stats_mod_max_score <- readRDS(file = "/Users/luketheduke2/ownCloud/kemp_projects/bdot/moult/out/stats_mod_max_score.rds")
+stats_mod_max_score <- readRDS(file = "/Users/leberhart/ownCloud/kemp_projects/bdot/moult/out/stats_mod_max_score.rds")
 ```
 
 ```{r, include=FALSE}
@@ -776,7 +783,7 @@ effects_mod_max_score <-
                           ifelse(sex == "M", as.numeric(factor(sex)), NA)))
 ```
 
-#### sex-specific breeding plumage model predictions 
+#### Sex-specific breeding plumage model predictions 
 ```{r, echo=FALSE, fig.width=4, fig.align='center'}
 ggplot() +
   geom_errorbar(data = effects_mod_max_score, 
@@ -807,12 +814,12 @@ ggplot() +
                      breaks = c(1.1, 1.9), 
                      labels = c("female", "male")) +
   ylab("maximum breeding plumage score observed\n(mean ± 95% CI)") +
-  scale_fill_brewer(palette = "Set2") +
+  scale_fill_brewer(palette = "Set2", direction = -1) +
   scale_y_continuous(limits = c(3.8, 7.2))
 ```
 
-### Age- and sex-specific variation in breeding plumage (of known-aged birds)
-data wrangle for sex-age model. Standardize max_breeding_score according to sex to make males and females to make them comparable across ages (i.e., does max_breeding_score change across age while accounting for underlying sex differences?)
+### Age-and sex-specific variation in breeding plumage
+data wrangle for sex-age model. Standardize max_breeding_score according to sex to make males and females to make them comparable across ages (i.e., does max_breeding_score change across age while accounting for underlying sex differences?) Only applied to known-aged birds.
 ```{r}
 # extract the core breeding months (i.e., when presumably all birds are at their maximum breeding plumage), and determine the maximum score for each individual.
 ind_breeding_scores_age <- 
@@ -893,7 +900,7 @@ stats_mod_max_score_age <-
 
 ```{r, include=FALSE}
 # saveRDS(stats_mod_max_score_age, file = "out/stats_mod_max_score_age.rds")
-stats_mod_max_score_age <- readRDS(file = "/Users/luketheduke2/ownCloud/kemp_projects/bdot/moult/out/stats_mod_max_score_age.rds")
+stats_mod_max_score_age <- readRDS(file = "/Users/leberhart/ownCloud/kemp_projects/bdot/moult/out/stats_mod_max_score_age.rds")
 ```
 
 ```{r, include=FALSE}
@@ -1079,8 +1086,8 @@ ggplot() +
                     labels = c("Female (N = 14)", "Male (N = 10)"))
 ```
 
-### Migratory status- and sex-specific variation in breeding plumage (of known-status birds)
-data wrangle for sex-migratory status model
+### Migratory status-and sex-specific variation in breeding plumage
+data wrangle for sex-migratory status model - only applied to birds with known migratory status based on winter resightings 
 ```{r}
 # extract the core breeding months (i.e., when presumably all birds are at their maximum breeding plumage), and determine the maximum score for each individual.
 ind_breeding_scores_status <- 
@@ -1205,7 +1212,7 @@ stats_mod_max_score_status <-
 
 ```{r, include=FALSE}
 # saveRDS(stats_mod_max_score_status, file = "out/stats_mod_max_score_status.rds")
-stats_mod_max_score_status <- readRDS(file = "/Users/luketheduke2/ownCloud/kemp_projects/bdot/moult/out/stats_mod_max_score_status.rds")
+stats_mod_max_score_status <- readRDS(file = "/Users/leberhart/ownCloud/kemp_projects/bdot/moult/out/stats_mod_max_score_status.rds")
 ```
 
 ```{r, echo=FALSE}
@@ -1981,7 +1988,7 @@ ggplot() +
 ## 2021 season
 # import and consolidate key columns
 breeding_data_2021 <- 
-  read_excel("/Users/luketheduke2/ownCloud/kemp_projects/bdot/moult/data/Kaikoura_Dotterel_2021_Feb2022_upd_Nov22_Locations.xlsx", 
+  read_excel("/Users/leberhart/ownCloud/kemp_projects/bdot/moult/data/Kaikoura_Dotterel_2021_Feb2022_upd_Nov22_Locations.xlsx", 
                      sheet = "Kaikoura_NestVisit2021_1", 
                      col_types = "text") %>%
   mutate(visit_date_ = as.POSIXct(as.numeric(`Visit Date`) * 86400, origin = "1899-12-30", tz = "UTC")) %>% 
@@ -2045,7 +2052,7 @@ breeding_data_2021 <-
 
 # import and consolidate key columns
 breeding_data_2021_ <-
-  read_excel("/Users/luketheduke2/ownCloud/kemp_projects/bdot/moult/data/Kaikoura_Dotterel_2021_Feb2022_upd_Nov22_Locations.xlsx", 
+  read_excel("/Users/leberhart/ownCloud/kemp_projects/bdot/moult/data/Kaikoura_Dotterel_2021_Feb2022_upd_Nov22_Locations.xlsx", 
                      sheet = "Kaikoura_DotterelNest2021_0", 
                      col_types = "text") %>%
   mutate(hatch_date_ = as.POSIXct(as.numeric(`Date Hatched`) * 86400, origin = "1899-12-30", tz = "UTC"),
@@ -2085,7 +2092,7 @@ breeding_2021_final <- left_join(breeding_data_2021, breeding_data_2021_, by = "
 
 # import and consolidate key columns
 breeding_data_2022 <- 
-  read_excel("/Users/luketheduke2/ownCloud/kemp_projects/bdot/moult/data/Kaikoura_Dotterel_Jan23_upd.xlsx", 
+  read_excel("/Users/leberhart/ownCloud/kemp_projects/bdot/moult/data/Kaikoura_Dotterel_Jan23_upd.xlsx", 
                      sheet = "Kaikoura_NestVisit_1", 
                      col_types = "text") %>%
   mutate(visit_date_ = as.POSIXct(as.numeric(`Visit Date`) * 86400, origin = "1899-12-30", tz = "UTC")) %>% 
@@ -2126,7 +2133,7 @@ breeding_data_2022 <-
 
 # import and consolidate key columns
 breeding_data_2022_ <-
-  read_excel("/Users/luketheduke2/ownCloud/kemp_projects/bdot/moult/data/Kaikoura_Dotterel_Jan23_upd.xlsx", 
+  read_excel("/Users/leberhart/ownCloud/kemp_projects/bdot/moult/data/Kaikoura_Dotterel_Jan23_upd.xlsx", 
                      sheet = "Kaikoura_DotterelNest_0", 
                      col_types = "text") %>%
   mutate(hatch_date_ = as.POSIXct(as.numeric(`Date Hatched`) * 86400, origin = "1899-12-30", tz = "UTC"),
@@ -2168,7 +2175,7 @@ breeding_2022_final <- left_join(breeding_data_2022, breeding_data_2022_, by = "
 
 # import and consolidate key columns
 breeding_data_2023 <- 
-  read_excel("/Users/luketheduke2/ownCloud/kemp_projects/bdot/moult/data/Kaikoura_Dotterel_Feb2024_upd.xlsx", 
+  read_excel("/Users/leberhart/ownCloud/kemp_projects/bdot/moult/data/Kaikoura_Dotterel_Feb2024_upd.xlsx", 
                      sheet = "Kaikoura_NestVisit_1", 
                      col_types = "text") %>%
   mutate(visit_date_ = as.POSIXct(as.numeric(`Visit Date`) * 86400, origin = "1899-12-30", tz = "UTC")) %>% 
@@ -2209,7 +2216,7 @@ breeding_data_2023 <-
 
 # import and consolidate key columns
 breeding_data_2023_ <-
-  read_excel("/Users/luketheduke2/ownCloud/kemp_projects/bdot/moult/data/Kaikoura_Dotterel_Feb2024_upd.xlsx", 
+  read_excel("/Users/leberhart/ownCloud/kemp_projects/bdot/moult/data/Kaikoura_Dotterel_Feb2024_upd.xlsx", 
                      sheet = "Kaikoura_DotterelNest_0", 
                      col_types = "text") %>%
   mutate(hatch_date_ = as.POSIXct(as.numeric(`Date Hatched`) * 86400, origin = "1899-12-30", tz = "UTC"),
