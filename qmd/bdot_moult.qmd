@@ -2055,18 +2055,28 @@ breeding_data_2021 <-
               rename(parent = parent2)) %>% 
   filter(!is.na(parent)) %>% 
   filter(parent %in% (dat %>% filter(season == 2021) %>% pull(rings_comb) %>% unique())) %>%
-  filter(nest_fate == "Occupied" | as.numeric(chicks) > 0) %>%
+  filter(nest_fate == "Occupied" | as.numeric(chicks) > 0 | as.numeric(chicks) == -1) %>%
+  mutate(nest_id = sub("^([^[:space:]]+).*", "\\1", NestID)) %>%
   group_by(parent) %>% 
   mutate(
     first_date_breeding = date[which.min(date)],
-    last_date_breeding = date[which.max(date)]) %>%
+    last_date_breeding = date[which.max(date)],
+    first_nest_id = nest_id[which.min(date)],
+    last_nest_id = nest_id[which.max(date)]) %>%
   # arrange(desc(date)) %>%
   # slice(1) %>%
   ungroup() %>%
   # arrange(desc(date)) %>%
-  mutate(nest_id = sub("^([^[:space:]]+).*", "\\1", NestID)) %>%
+  group_by(nest_id) %>% 
+  mutate(
+    first_date_nest = date[which.min(date)],
+    last_date_nest = date[which.max(date)]) %>%
+  filter(first_date_nest == date | last_date_nest == date) %>% 
   # rename(last_date_breeding = date) %>% 
-  select(parent, first_date_breeding, last_date_breeding, nest_id, OBJECTID)
+  select(parent, first_date_breeding, last_date_breeding, first_nest_id, last_nest_id, first_date_nest, last_date_nest, nest_id, OBJECTID) %>%
+  group_by(parent) %>% 
+  mutate(last_nest_first_obs = first_date_nest[which.max(first_date_nest)]) %>% 
+  ungroup()
 
 # import and consolidate key columns
 breeding_data_2021_ <-
@@ -2083,26 +2093,34 @@ breeding_data_2021_ <-
          fail_date = as.Date(fail_date_nz),
          found_date = as.Date(found_date_nz)) %>%
   mutate(nest_id = sub("^([^[:space:]]+).*", "\\1", `Nest ID`)) %>% 
-  select(OBJECTID, nest_id, found_date, hatch_date, fail_date)
+  select(OBJECTID, nest_id, found_date, hatch_date, fail_date) %>% 
+  mutate(time_bw_found_hatch = hatch_date - found_date)  %>% 
+    mutate(lay_date = as.Date(ifelse(time_bw_found_hatch < 25, hatch_date - 28, found_date))) %>% 
+    arrange(time_bw_found_hatch)
 
-breeding_2021_final <- left_join(breeding_data_2021, breeding_data_2021_, by = "nest_id") %>%
+breeding_2021_final <- 
+  left_join(breeding_data_2021, breeding_data_2021_, by = "nest_id") %>%
   mutate(date_check = ifelse((!is.na(found_date) & is.na(fail_date) & is.na(hatch_date)) | 
                                ((!is.na(hatch_date) & found_date < hatch_date)) | 
                                ((!is.na(fail_date) & !is.na(hatch_date)) & hatch_date < fail_date) |
                                ((!is.na(fail_date) & found_date < fail_date)), 1, 0)) %>% 
   group_by(parent) %>% 
   mutate(last_date_breeding_ = max(found_date, hatch_date, fail_date, na.rm = TRUE)) %>% 
-  mutate(first_date_breeding_ = min(found_date, hatch_date, fail_date, na.rm = TRUE)) %>% 
+  mutate(first_date_breeding_ = min(found_date, hatch_date, fail_date, lay_date, na.rm = TRUE)) %>% 
   mutate(days_diff = last_date_breeding_ - last_date_breeding) %>% 
   mutate(days_diff = first_date_breeding_ - first_date_breeding) %>% 
   arrange(desc(days_diff)) %>% 
   mutate(last_date_breeding_final = as.Date(ifelse(days_diff > 0, last_date_breeding + ceiling(days_diff/2), last_date_breeding)),
          first_date_breeding_final = as.Date(ifelse(days_diff > 0, first_date_breeding + ceiling(days_diff/2), first_date_breeding))) %>% 
   # arrange(desc(last_date_breeding_final)) %>% 
-  select(parent, first_date_breeding_final, last_date_breeding_final) %>% 
   # specify the season as the first calender year
   mutate(season = ifelse(month(last_date_breeding_final) < 7, year(last_date_breeding_final) - 1, year(last_date_breeding_final))) %>% 
-  distinct()
+  distinct() %>% 
+  mutate(first_date_nest = ifelse(!is.na(lay_date) & lay_date < first_date_nest, lay_date, first_date_nest)) %>% 
+  group_by(parent) %>% 
+  mutate(last_nest_first_obs = as.Date(first_date_nest[which.max(first_date_nest)])) %>% 
+  select(parent, first_date_breeding_final, last_date_breeding_final, last_nest_first_obs)
+
 
 ###########
 
@@ -2136,18 +2154,28 @@ breeding_data_2022 <-
               rename(parent = parent2)) %>% 
   filter(!is.na(parent)) %>% 
   filter(parent %in% (dat %>% filter(season == 2022) %>% pull(rings_comb) %>% unique())) %>%
-  filter(nest_fate == "Occupied" | as.numeric(chicks) > 0) %>%
+  filter(nest_fate == "Occupied" | as.numeric(chicks) > 0 | as.numeric(chicks) == -1) %>%
+  mutate(nest_id = sub("^([^[:space:]]+).*", "\\1", NestID)) %>%
   group_by(parent) %>% 
   mutate(
     first_date_breeding = date[which.min(date)],
-    last_date_breeding = date[which.max(date)]) %>%
+    last_date_breeding = date[which.max(date)],
+    first_nest_id = nest_id[which.min(date)],
+    last_nest_id = nest_id[which.max(date)]) %>%
   # arrange(desc(date)) %>%
   # slice(1) %>%
   ungroup() %>%
   # arrange(desc(date)) %>%
-  mutate(nest_id = sub("^([^[:space:]]+).*", "\\1", NestID)) %>%
+  group_by(nest_id) %>% 
+  mutate(
+    first_date_nest = date[which.min(date)],
+    last_date_nest = date[which.max(date)]) %>%
+  filter(first_date_nest == date | last_date_nest == date) %>% 
   # rename(last_date_breeding = date) %>% 
-  select(parent, first_date_breeding, last_date_breeding, nest_id, OBJECTID)
+  select(parent, first_date_breeding, last_date_breeding, first_nest_id, last_nest_id, first_date_nest, last_date_nest, nest_id, OBJECTID) %>%
+  group_by(parent) %>% 
+  mutate(last_nest_first_obs = first_date_nest[which.max(first_date_nest)]) %>% 
+  ungroup()
 
 # import and consolidate key columns
 breeding_data_2022_ <-
@@ -2164,26 +2192,32 @@ breeding_data_2022_ <-
          fail_date = as.Date(fail_date_nz),
          found_date = as.Date(found_date_nz)) %>%
   mutate(nest_id = sub("^([^[:space:]]+).*", "\\1", `Nest ID`)) %>% 
-  select(OBJECTID, nest_id, found_date, hatch_date, fail_date)
+  select(OBJECTID, nest_id, found_date, hatch_date, fail_date) %>% 
+  mutate(time_bw_found_hatch = hatch_date - found_date)  %>% 
+    mutate(lay_date = as.Date(ifelse(time_bw_found_hatch < 25, hatch_date - 28, found_date))) %>% 
+    arrange(time_bw_found_hatch)
 
 breeding_2022_final <- left_join(breeding_data_2022, breeding_data_2022_, by = "nest_id") %>%
   mutate(date_check = ifelse((!is.na(found_date) & is.na(fail_date) & is.na(hatch_date)) | 
                                ((!is.na(hatch_date) & found_date < hatch_date)) | 
                                ((!is.na(fail_date) & !is.na(hatch_date)) & hatch_date < fail_date) |
                                ((!is.na(fail_date) & found_date < fail_date)), 1, 0)) %>% 
- group_by(parent) %>% 
+  group_by(parent) %>% 
   mutate(last_date_breeding_ = max(found_date, hatch_date, fail_date, na.rm = TRUE)) %>% 
-  mutate(first_date_breeding_ = min(found_date, hatch_date, fail_date, na.rm = TRUE)) %>% 
+  mutate(first_date_breeding_ = min(found_date, hatch_date, fail_date, lay_date, na.rm = TRUE)) %>% 
   mutate(days_diff = last_date_breeding_ - last_date_breeding) %>% 
   mutate(days_diff = first_date_breeding_ - first_date_breeding) %>% 
   arrange(desc(days_diff)) %>% 
   mutate(last_date_breeding_final = as.Date(ifelse(days_diff > 0, last_date_breeding + ceiling(days_diff/2), last_date_breeding)),
          first_date_breeding_final = as.Date(ifelse(days_diff > 0, first_date_breeding + ceiling(days_diff/2), first_date_breeding))) %>% 
   # arrange(desc(last_date_breeding_final)) %>% 
-  select(parent, first_date_breeding_final, last_date_breeding_final) %>% 
   # specify the season as the first calender year
   mutate(season = ifelse(month(last_date_breeding_final) < 7, year(last_date_breeding_final) - 1, year(last_date_breeding_final))) %>% 
-  distinct()
+  distinct() %>% 
+  mutate(first_date_nest = ifelse(!is.na(lay_date) & lay_date < first_date_nest, lay_date, first_date_nest)) %>% 
+  group_by(parent) %>% 
+  mutate(last_nest_first_obs = as.Date(first_date_nest[which.max(first_date_nest)])) %>% 
+  select(parent, first_date_breeding_final, last_date_breeding_final, last_nest_first_obs)
 
 
 
@@ -2219,25 +2253,35 @@ breeding_data_2023 <-
               rename(parent = parent2)) %>% 
   filter(!is.na(parent)) %>% 
   filter(parent %in% (dat %>% filter(season == 2023) %>% pull(rings_comb) %>% unique())) %>%
-  filter(nest_fate == "Occupied" | as.numeric(chicks) > 0) %>%
-   group_by(parent) %>% 
+  filter(nest_fate == "Occupied" | as.numeric(chicks) > 0 | as.numeric(chicks) == -1) %>%
+  mutate(nest_id = sub("^([^[:space:]]+).*", "\\1", NestID)) %>%
+  group_by(parent) %>% 
   mutate(
     first_date_breeding = date[which.min(date)],
-    last_date_breeding = date[which.max(date)]) %>%
+    last_date_breeding = date[which.max(date)],
+    first_nest_id = nest_id[which.min(date)],
+    last_nest_id = nest_id[which.max(date)]) %>%
   # arrange(desc(date)) %>%
   # slice(1) %>%
   ungroup() %>%
   # arrange(desc(date)) %>%
-  mutate(nest_id = sub("^([^[:space:]]+).*", "\\1", NestID)) %>%
+  group_by(nest_id) %>% 
+  mutate(
+    first_date_nest = date[which.min(date)],
+    last_date_nest = date[which.max(date)]) %>%
+  filter(first_date_nest == date | last_date_nest == date) %>% 
   # rename(last_date_breeding = date) %>% 
-  select(parent, first_date_breeding, last_date_breeding, nest_id, OBJECTID)
+  select(parent, first_date_breeding, last_date_breeding, first_nest_id, last_nest_id, first_date_nest, last_date_nest, nest_id, OBJECTID) %>%
+  group_by(parent) %>% 
+  mutate(last_nest_first_obs = first_date_nest[which.max(first_date_nest)]) %>% 
+  ungroup()
 
 # import and consolidate key columns
 breeding_data_2023_ <-
   read_excel("/Users/leberhart/ownCloud/kemp_projects/bdot/moult/data/Kaikoura_Dotterel_Feb2024_upd.xlsx", 
                      sheet = "Kaikoura_DotterelNest_0", 
                      col_types = "text") %>%
-  mutate(hatch_date_ = as.POSIXct(as.numeric(`Date Hatched`) * 86400, origin = "1899-12-30", tz = "UTC"),
+    mutate(hatch_date_ = as.POSIXct(as.numeric(`Date Hatched`) * 86400, origin = "1899-12-30", tz = "UTC"),
          fail_date_ = as.POSIXct(as.numeric(`Date Failed`) * 86400, origin = "1899-12-30", tz = "UTC"),
          found_date_ = as.POSIXct(as.numeric(`Date Found`) * 86400, origin = "1899-12-30", tz = "UTC")) %>% 
   mutate(hatch_date_nz = with_tz(hatch_date_, tzone = "Pacific/Auckland"),
@@ -2247,7 +2291,10 @@ breeding_data_2023_ <-
          fail_date = as.Date(fail_date_nz),
          found_date = as.Date(found_date_nz)) %>%
   mutate(nest_id = sub("^([^[:space:]]+).*", "\\1", `Nest ID`)) %>% 
-  select(OBJECTID, nest_id, found_date, hatch_date, fail_date)
+  select(OBJECTID, nest_id, found_date, hatch_date, fail_date) %>% 
+  mutate(time_bw_found_hatch = hatch_date - found_date)  %>% 
+    mutate(lay_date = as.Date(ifelse(time_bw_found_hatch < 25, hatch_date - 28, found_date))) %>% 
+    arrange(time_bw_found_hatch)
 
 breeding_2023_final <- left_join(breeding_data_2023, breeding_data_2023_, by = "nest_id") %>%
   mutate(date_check = ifelse((!is.na(found_date) & is.na(fail_date) & is.na(hatch_date)) | 
@@ -2256,33 +2303,41 @@ breeding_2023_final <- left_join(breeding_data_2023, breeding_data_2023_, by = "
                                ((!is.na(fail_date) & found_date < fail_date)), 1, 0)) %>% 
   group_by(parent) %>% 
   mutate(last_date_breeding_ = max(found_date, hatch_date, fail_date, na.rm = TRUE)) %>% 
-  mutate(first_date_breeding_ = min(found_date, hatch_date, fail_date, na.rm = TRUE)) %>% 
+  mutate(first_date_breeding_ = min(found_date, hatch_date, fail_date, lay_date, na.rm = TRUE)) %>% 
   mutate(days_diff = last_date_breeding_ - last_date_breeding) %>% 
   mutate(days_diff = first_date_breeding_ - first_date_breeding) %>% 
   arrange(desc(days_diff)) %>% 
   mutate(last_date_breeding_final = as.Date(ifelse(days_diff > 0, last_date_breeding + ceiling(days_diff/2), last_date_breeding)),
          first_date_breeding_final = as.Date(ifelse(days_diff > 0, first_date_breeding + ceiling(days_diff/2), first_date_breeding))) %>% 
   # arrange(desc(last_date_breeding_final)) %>% 
-  select(parent, first_date_breeding_final, last_date_breeding_final) %>% 
   # specify the season as the first calender year
   mutate(season = ifelse(month(last_date_breeding_final) < 7, year(last_date_breeding_final) - 1, year(last_date_breeding_final))) %>% 
-  distinct()
+  distinct() %>% 
+  mutate(first_date_nest = ifelse(!is.na(lay_date) & lay_date < first_date_nest, lay_date, first_date_nest)) %>% 
+  group_by(parent) %>% 
+  mutate(last_nest_first_obs = as.Date(first_date_nest[which.max(first_date_nest)])) %>% 
+  select(parent, first_date_breeding_final, last_date_breeding_final, last_nest_first_obs)
 
 
 # combine breeding data from the 3 seasons into one table
 
-breeding_data_all <- bind_rows(breeding_2021_final,breeding_2022_final,breeding_2023_final) %>% 
+breeding_data_all <- 
+  bind_rows(breeding_2021_final, breeding_2022_final, breeding_2023_final) %>% 
   rename(rings_comb = parent) %>% 
   # change to Julian date shifted for the Southern Hemisphere (1 = July 1)
   mutate(last_breeding_date_J = as.numeric(format(last_date_breeding_final + 181, "%j")),
-         first_breeding_date_J = as.numeric(format(first_date_breeding_final + 181, "%j"))) %>% 
+         first_breeding_date_J = as.numeric(format(first_date_breeding_final + 181, "%j")),
+         last_nest_first_obs_J = as.numeric(format(last_nest_first_obs + 181, "%j"))) %>% 
   ungroup() %>% 
+  mutate(season = ifelse(month(first_date_breeding_final) < 7, year(first_date_breeding_final) - 1, year(first_date_breeding_final))) %>% 
   # standardize the last breeding date by year
   mutate(last_breeding_date_J_s = scale_by(last_breeding_date_J ~ season, ., scale = 0),
-         first_breeding_date_J_s = scale_by(first_breeding_date_J ~ season, ., scale = 0)) %>% 
+         first_breeding_date_J_s = scale_by(first_breeding_date_J ~ season, ., scale = 0),
+         last_nest_first_obs_J_s  = scale_by(last_nest_first_obs_J ~ season, ., scale = 0)) %>% 
   # make the scaled date variable numeric class
   mutate(last_breeding_date_J_snum = as.numeric(last_breeding_date_J_s),
-         first_breeding_date_J_snum = as.numeric(first_breeding_date_J_s))
+         first_breeding_date_J_snum = as.numeric(first_breeding_date_J_s),
+         last_nest_first_obs_J_snum = as.numeric(last_nest_first_obs_J_s))
 
 ```
 
@@ -2295,7 +2350,7 @@ ind_prop_molt_scores_last_breeding_date <-
   arrange(rings_comb, season, date_diff) %>% 
   group_by(rings_comb, season) %>% slice(1) %>% 
   filter(date_diff < 28) %>% # duration of incubation (days)
-  dplyr::select(rings_comb, season, sex, last_breeding_date_J, last_breeding_date_J_snum, prop_molt_score_max, max_breeding_score, age, migratory_status) %>% 
+  dplyr::select(rings_comb, season, sex, last_breeding_date_J, last_breeding_date_J_snum, last_nest_first_obs_J_snum, prop_molt_score_max, max_breeding_score, age, migratory_status) %>% 
   distinct() %>%
   group_by(sex) %>%
   mutate(std_max_breeding_score = (max_breeding_score - mean(max_breeding_score, na.rm = TRUE)) / sd(max_breeding_score, na.rm = TRUE)) %>%
@@ -2308,7 +2363,7 @@ ind_prop_molt_scores_first_breeding_date <-
   mutate(date_diff = abs(first_breeding_date_J - date_J)) %>% 
   arrange(rings_comb, season, date_diff) %>% 
   group_by(rings_comb, season) %>% slice(1) %>% 
-  dplyr::select(rings_comb, season, sex, first_breeding_date_J, first_breeding_date_J_snum, prop_molt_score_max, max_breeding_score, age, migratory_status) %>% 
+  dplyr::select(rings_comb, season, sex, first_breeding_date_J, first_breeding_date_J_snum, last_nest_first_obs_J_snum, prop_molt_score_max, max_breeding_score, age, migratory_status) %>% 
   distinct() %>%
   group_by(sex) %>%
   mutate(std_max_breeding_score = (max_breeding_score - mean(max_breeding_score, na.rm = TRUE)) / sd(max_breeding_score, na.rm = TRUE)) %>%
@@ -2347,6 +2402,40 @@ ggplot() +
         panel.grid.minor = element_blank(),
         panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90")) +
   ylab("year-scaled date of last breeding attempt") +
+  xlab("sex-scaled max. breeding plumage score")
+```
+
+#### effect of breeding plumage score on late nest initiation
+do individuals with a fuller breeding plumage (for their sex) breed later than the rest of the population? No effect
+```{r}
+mod_max_score_last_initiation_date <- 
+  lme4::lmer(last_nest_first_obs_J_snum ~ 
+                 std_max_breeding_score + 
+         (1 | rings_comb) + (1 | season),
+       data = ind_prop_molt_scores_last_breeding_date)
+
+tbl_regression(mod_max_score_last_initiation_date, intercept = TRUE, 
+               label = list(std_max_breeding_score ~ "max. breeding plumage score (sex-scaled)"))
+
+ggplot() +
+  geom_line(data = as.data.frame(allEffects(mod_max_score_last_initiation_date))$std_max_breeding_score,
+            aes(x = std_max_breeding_score, y = fit)) +
+  geom_ribbon(data = as.data.frame(allEffects(mod_max_score_last_initiation_date))$std_max_breeding_score,
+              aes(x = std_max_breeding_score, ymax = upper, ymin = lower),
+              lwd = 1, alpha = 0.25) +
+  geom_point(data = ind_prop_molt_scores_last_breeding_date,
+              aes(x = std_max_breeding_score, y = last_nest_first_obs_J_snum),
+              alpha = 1, shape = 20) +
+  theme(text = element_text(family = "Verdana"),
+        axis.ticks = element_blank(),
+        plot.margin = unit(c(0.2,0.2,0.2,0.2), "cm"),
+        panel.spacing = unit(1, "cm"),
+        panel.background = element_rect(fill = 'transparent', color = NA),
+        plot.background = element_rect(fill = 'transparent', color = NA), 
+        panel.grid.major.y = element_line(size = 0.25, lineend = "round", colour = "grey90"),
+        panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90")) +
+  ylab("year-scaled initiation date of last nesting attempt") +
   xlab("sex-scaled max. breeding plumage score")
 ```
 
@@ -2418,6 +2507,40 @@ ggplot() +
   ylab("sex-scaled max. breeding plumage score")
 ```
 
+#### effect of late nest initiation on breeding plumage score
+do individuals with a late nest initiation tend to have a fuller breeding plumage? No effect
+```{r}
+mod_last_nest_initiation_date_max_score <- 
+  lme4::lmer(std_max_breeding_score ~ 
+                 last_nest_first_obs_J_snum +
+         (1 | rings_comb) + (1 | season),
+       data = ind_prop_molt_scores_last_breeding_date)
+
+tbl_regression(mod_last_nest_initiation_date_max_score, intercept = TRUE, 
+               label = list(last_nest_first_obs_J_snum ~ "initiation date of last nest (year-scaled)"))
+
+ggplot() +
+  geom_line(data = as.data.frame(allEffects(mod_last_nest_initiation_date_max_score))$last_nest_first_obs_J_snum,
+            aes(x = last_nest_first_obs_J_snum, y = fit)) +
+  geom_ribbon(data = as.data.frame(allEffects(mod_last_nest_initiation_date_max_score))$last_nest_first_obs_J_snum,
+              aes(x = last_nest_first_obs_J_snum, ymax = upper, ymin = lower),
+              lwd = 1, alpha = 0.25) +
+  geom_point(data = ind_prop_molt_scores_last_breeding_date,
+              aes(x = last_nest_first_obs_J_snum, y = std_max_breeding_score),
+              alpha = 1, shape = 20) +
+  theme(text = element_text(family = "Verdana"),
+        axis.ticks = element_blank(),
+        plot.margin = unit(c(0.2,0.2,0.2,0.2), "cm"),
+        panel.spacing = unit(1, "cm"),
+        panel.background = element_rect(fill = 'transparent', color = NA),
+        plot.background = element_rect(fill = 'transparent', color = NA), 
+        panel.grid.major.y = element_line(size = 0.25, lineend = "round", colour = "grey90"),
+        panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90")) +
+  xlab("year-scaled intiation date of last nest") +
+  ylab("sex-scaled max. breeding plumage score")
+```
+
 ### Relationships between breeding schedule and moult
 #### effect of prolonged breeding on moult
 do individuals with late breeding attempts have a delayed moult? No effect
@@ -2449,6 +2572,39 @@ ggplot() +
         panel.grid.minor = element_blank(),
         panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90")) +
   xlab("year-scaled date of last breeding attempt") +
+  ylab("mid-point date between\nlast max score photo and first photo during moult")
+```
+
+#### effect of late nest initiation on moult
+do individuals with late nest initiation have a delayed moult? No effect
+```{r}
+mod_late_initiation_date_prop_molt_mid <- 
+  lmer(mid_point_date_J ~ last_nest_first_obs_J_snum + 
+         (1 | rings_comb) + (1 | season),
+       data = ind_prop_molt_scores_last_breeding_date)
+
+tbl_regression(mod_late_initiation_date_prop_molt_mid, intercept = TRUE, 
+               label = list(last_nest_first_obs_J_snum ~ "initiation date of last nest (year-scaled)"))
+
+ggplot() +
+  geom_line(data = as.data.frame(allEffects(mod_late_initiation_date_prop_molt_mid))$last_nest_first_obs_J_snum,
+            aes(x = last_nest_first_obs_J_snum, y = fit)) +
+  geom_ribbon(data = as.data.frame(allEffects(mod_late_initiation_date_prop_molt_mid))$last_nest_first_obs_J_snum,
+              aes(x = last_nest_first_obs_J_snum, ymax = upper, ymin = lower),
+              lwd = 1, alpha = 0.25) +
+  geom_point(data = ind_prop_molt_scores_last_breeding_date,
+              aes(x = last_nest_first_obs_J_snum, y = mid_point_date_J),
+              alpha = 1, shape = 20) +
+  theme(text = element_text(family = "Verdana"),
+        axis.ticks = element_blank(),
+        plot.margin = unit(c(0.2,0.2,0.2,0.2), "cm"),
+        panel.spacing = unit(1, "cm"),
+        panel.background = element_rect(fill = 'transparent', color = NA),
+        plot.background = element_rect(fill = 'transparent', color = NA), 
+        panel.grid.major.y = element_line(size = 0.25, lineend = "round", colour = "grey90"),
+        panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90")) +
+  xlab("year-scaled intiation date of last nest") +
   ylab("mid-point date between\nlast max score photo and first photo during moult")
 ```
 
@@ -2486,6 +2642,40 @@ ggplot() +
   ylab("last date photographed with max score")
 ```
 
+#### effect of late nest initation on prolonged retention of full plumage
+do individuals with late breeding attempts retain their full breeding plumage longer?
+There is a positive relationship between the date when an individual was last seen with its maximum breeding plumage and the date when it was last observed breeding.
+```{r}
+mod_late_initiation_prop_molt_latest <- 
+  lmer(latest_max_date_J ~ last_nest_first_obs_J_snum + 
+        (1 | season),
+       data = ind_prop_molt_scores_last_breeding_date)
+
+tbl_regression(mod_late_initiation_prop_molt_latest, intercept = TRUE, 
+               label = list(last_nest_first_obs_J_snum ~ "initiation date of last nest (year-scaled)"))
+
+ggplot() +
+  geom_line(data = as.data.frame(allEffects(mod_late_initiation_prop_molt_latest))$last_nest_first_obs_J_snum,
+            aes(x = last_nest_first_obs_J_snum, y = fit)) +
+  geom_ribbon(data = as.data.frame(allEffects(mod_late_initiation_prop_molt_latest))$last_nest_first_obs_J_snum,
+              aes(x = last_nest_first_obs_J_snum, ymax = upper, ymin = lower),
+              lwd = 1, alpha = 0.25) +
+  geom_point(data = ind_prop_molt_scores_last_breeding_date,
+              aes(x = last_nest_first_obs_J_snum, y = latest_max_date_J),
+              alpha = 1, shape = 20) +
+  theme(text = element_text(family = "Verdana"),
+        axis.ticks = element_blank(),
+        plot.margin = unit(c(0.2,0.2,0.2,0.2), "cm"),
+        panel.spacing = unit(1, "cm"),
+        panel.background = element_rect(fill = 'transparent', color = NA),
+        plot.background = element_rect(fill = 'transparent', color = NA), 
+        panel.grid.major.y = element_line(size = 0.25, lineend = "round", colour = "grey90"),
+        panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90")) +
+  xlab("year-scaled intiation date of last nest") +
+  ylab("last date photographed with max score")
+```
+
 ### Relationships between age and breeding phenology
 #### effect of age on prolonged breeding 
 do older individuals conclude their breeding season later? No
@@ -2520,6 +2710,39 @@ ggplot() +
   ylab("year-scaled date of last breeding attempt")
 ```
 
+#### effect of age on prolonged breeding 
+do older individuals initiate later nests? No
+```{r}
+mod_age_late_initiation_date <- 
+  lme4::lmer(last_nest_first_obs_J_snum ~ age +
+        (1 | rings_comb) + (1 | season),
+       data = ind_prop_molt_scores_last_breeding_date)
+
+tbl_regression(mod_age_late_initiation_date, intercept = TRUE, 
+               label = list(age ~ "Age"))
+
+ggplot() +
+  geom_line(data = as.data.frame(allEffects(mod_age_late_initiation_date))$age,
+            aes(x = age, y = fit)) +
+  geom_ribbon(data = as.data.frame(allEffects(mod_age_late_initiation_date))$age,
+              aes(x = age, ymax = upper, ymin = lower),
+              lwd = 1, alpha = 0.25) +
+  geom_point(data = ind_prop_molt_scores_last_breeding_date,
+              aes(x = age, y = last_nest_first_obs_J_snum),
+              alpha = 1, shape = 20) +
+  theme(text = element_text(family = "Verdana"),
+        axis.ticks = element_blank(),
+        plot.margin = unit(c(0.2,0.2,0.2,0.2), "cm"),
+        panel.spacing = unit(1, "cm"),
+        panel.background = element_rect(fill = 'transparent', color = NA),
+        plot.background = element_rect(fill = 'transparent', color = NA), 
+        panel.grid.major.y = element_line(size = 0.25, lineend = "round", colour = "grey90"),
+        panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90")) +
+  xlab("age") +
+  ylab("year-scaled initiation date of last nest")
+```
+
 #### effect of age on early breeding 
 do older individuals start breeding earlier? No
 ```{r}
@@ -2552,13 +2775,6 @@ ggplot() +
   xlab("age") +
   ylab("year-scaled date of first breeding attempt")
 ```
-## Meeting notes:
-### 13-Nov-24: Bart, Luke, and Bashar via zoom
-- add the breeding data to the analysis: for each individual include the date of last breeding (i.e., last date seen with nest or brood) as a predictor of molt timing. Also do an analysis relating the timing of last breeding to the age of the individual. Bashar will send Luke the breeding data he received from Ted.
-
-- drop pre-October data from the molt timing analysis.
-
-- next steps: Bashar to eventually write up this study as a report (which could eventually be used as his MSc thesis if he wants). Priority will be on him writing up a proposal for his thesis (which has a concrete deadline and is graded). Bashar will present the study at our weekly Monday meeting in the first few months of 2025.
 
 # Relevent papers to read and consider for manuscript
 - @gilbert2022late: Late breeding season definitive prebasic molt in males, and late breeding season brood care by females, in central California Wilson’s warblers
