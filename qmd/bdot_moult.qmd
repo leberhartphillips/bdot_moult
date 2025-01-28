@@ -2645,8 +2645,7 @@ ggplot() +
 ```
 
 #### effect of late nest initation on prolonged retention of full plumage
-do individuals with late breeding attempts retain their full breeding plumage longer?
-There is a positive relationship between the date when an individual was last seen with its maximum breeding plumage and the date when it was last observed breeding.
+do individuals with late nest initiation retain their full breeding plumage longer? No Effect
 ```{r}
 mod_late_initiation_prop_molt_latest <- 
   lmer(latest_max_date_J ~ last_nest_first_obs_J_snum + 
