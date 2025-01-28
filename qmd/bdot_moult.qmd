@@ -360,7 +360,10 @@ ggplot(data = dat %>% filter(season == 2021 & sex == "F") %>% mutate(score = as.
         panel.grid.major.y = element_blank(),
         panel.grid.minor = element_blank(),
         axis.ticks = element_blank(),
-        strip.text.y.right = element_text(angle = 0)) +
+        strip.text.y.right = element_text(angle = 0),
+    panel.border = element_rect(linetype = "solid", colour = "grey90"),
+    strip.background = element_rect(color = "grey90", fill = "grey90"),
+    panel.grid.major.x = element_line(color = "grey30")) +
   scale_x_date(date_labels = "%W", expand = c(0.01, 0.01), 
                date_breaks = "3 week", 
                limits = c(as.Date("2021-07-05"), as.Date("2022-05-01"))) +
@@ -380,7 +383,10 @@ ggplot(data = dat %>% filter(season == 2021 & sex == "M") %>% mutate(score = as.
         panel.grid.major.y = element_blank(),
         panel.grid.minor = element_blank(),
         axis.ticks = element_blank(),
-        strip.text.y.right = element_text(angle = 0)) +
+        strip.text.y.right = element_text(angle = 0),
+    panel.border = element_rect(linetype = "solid", colour = "grey90"),
+    strip.background = element_rect(color = "grey90", fill = "grey90"),
+    panel.grid.major.x = element_line(color = "grey30")) +
   scale_x_date(date_labels = "%W", expand = c(0.01, 0.01), 
                date_breaks = "3 week", 
                limits = c(as.Date("2021-07-05"), as.Date("2022-05-01"))) +
@@ -402,7 +408,10 @@ ggplot(data = dat %>% filter(season == 2022 & sex == "F") %>% mutate(score = as.
         panel.grid.major.y = element_blank(),
         panel.grid.minor = element_blank(),
         axis.ticks = element_blank(),
-        strip.text.y.right = element_text(angle = 0)) +
+        strip.text.y.right = element_text(angle = 0),
+    panel.border = element_rect(linetype = "solid", colour = "grey90"),
+    strip.background = element_rect(color = "grey90", fill = "grey90"),
+    panel.grid.major.x = element_line(color = "grey30")) +
   scale_x_date(date_labels = "%W", expand = c(0.01, 0.01), 
                date_breaks = "3 week", 
                limits = c(as.Date("2022-07-05"), as.Date("2023-05-01"))) +
@@ -422,7 +431,10 @@ ggplot(data = dat %>% filter(season == 2022 & sex == "M") %>% mutate(score = as.
         panel.grid.major.y = element_blank(),
         panel.grid.minor = element_blank(),
         axis.ticks = element_blank(),
-        strip.text.y.right = element_text(angle = 0)) +
+        strip.text.y.right = element_text(angle = 0),
+    panel.border = element_rect(linetype = "solid", colour = "grey90"),
+    strip.background = element_rect(color = "grey90", fill = "grey90"),
+    panel.grid.major.x = element_line(color = "grey30")) +
   scale_x_date(date_labels = "%W", expand = c(0.01, 0.01), 
                date_breaks = "3 week", 
                limits = c(as.Date("2022-07-05"), as.Date("2023-05-01"))) +
@@ -444,7 +456,10 @@ ggplot(data = dat %>% filter(season == 2023 & sex == "F") %>% mutate(score = as.
         panel.grid.major.y = element_blank(),
         panel.grid.minor = element_blank(),
         axis.ticks = element_blank(),
-        strip.text.y.right = element_text(angle = 0)) +
+        strip.text.y.right = element_text(angle = 0),
+    panel.border = element_rect(linetype = "solid", colour = "grey90"),
+    strip.background = element_rect(color = "grey90", fill = "grey90"),
+    panel.grid.major.x = element_line(color = "grey30")) +
   scale_x_date(date_labels = "%W", expand = c(0.01, 0.01), 
                date_breaks = "3 week", 
                limits = c(as.Date("2023-07-01"), as.Date("2024-05-01"))) +
@@ -464,7 +479,10 @@ ggplot(data = dat %>% filter(season == 2023 & sex == "M") %>% mutate(score = as.
         panel.grid.major.y = element_blank(),
         panel.grid.minor = element_blank(),
         axis.ticks = element_blank(),
-        strip.text.y.right = element_text(angle = 0)) +
+        strip.text.y.right = element_text(angle = 0),
+    panel.border = element_rect(linetype = "solid", colour = "grey90"),
+    strip.background = element_rect(color = "grey90", fill = "grey90"),
+    panel.grid.major.x = element_line(color = "grey30")) +
   scale_x_date(date_labels = "%W", expand = c(0.01, 0.01), 
                date_breaks = "3 week", 
                limits = c(as.Date("2023-07-05"), as.Date("2024-05-01"))) +
@@ -1739,11 +1757,11 @@ plot_rs_bird_status <-
         panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90"),
         axis.title.x = element_blank()) +
   scale_y_continuous(limits = c(-0.05, 1.05)) +
-  ylab("proportion intact of individual-based maximum rufous band") +
+  ylab("proportion intact of\nindividual-based maximum rufous band") +
   scale_x_date(date_labels = "%B", 
                expand = c(0.01, 0.01), 
                date_breaks = "1 month") +
-  ggtitle("bird-specific slopes of\npre-basic moult timing (random)")
+  ggtitle("random slopes of\npre-basic moult timing")
 
 # plot the model
 plot_rs_bird_status_fs <- 
@@ -1779,7 +1797,7 @@ plot_rs_bird_status_fs <-
         panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90"),
         axis.title.x = element_blank()) +
   scale_y_continuous(limits = c(-0.05, 1.05)) +
-  ylab("proportion intact of individual-based maximum rufous band") +
+  ylab("proportion intact of\nindividual-based maximum rufous band") +
   scale_x_date(date_labels = "%B", 
                expand = c(0.01, 0.01), 
                date_breaks = "1 month") +
@@ -1787,7 +1805,7 @@ plot_rs_bird_status_fs <-
                     labels = c("Migrant (N = 5)", "Resident (N = 16)")) +
   scale_fill_brewer(palette = "Set1",
                     labels = c("Migrant (N = 5)", "Resident (N = 16)")) +
-  ggtitle("status-specific slopes\nof pre-basic moult timing (fixed)")
+  ggtitle("status-specific slopes\nof pre-basic moult timing")
 
 plot_rs_bird_status + plot_rs_bird_status_fs
 ```
@@ -1884,11 +1902,11 @@ plot_rs_bird_age <-
         panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90"),
         axis.title.x = element_blank()) +
   scale_y_continuous(limits = c(-0.05, 1.05)) +
-  ylab("proportion intact of individual-based maximum rufous band") +
+  ylab("proportion intact of\nindividual-based maximum rufous band") +
   scale_x_date(date_labels = "%B", 
                expand = c(0.01, 0.01), 
                date_breaks = "1 month") +
-  ggtitle("bird-specific slopes of\npre-basic moult timing (random)")
+  ggtitle("random slopes of\npre-basic moult timing")
 
 # plot the model
 plot_rs_bird_age_fs <- 
@@ -1924,7 +1942,7 @@ plot_rs_bird_age_fs <-
         panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90"),
         axis.title.x = element_blank()) +
   scale_y_continuous(limits = c(-0.05, 1.05)) +
-  ylab("proportion intact of individual-based maximum rufous band") +
+  ylab("proportion intact of\nindividual-based maximum rufous band") +
   scale_x_date(date_labels = "%B", 
                expand = c(0.01, 0.01), 
                date_breaks = "1 month") +
@@ -1936,12 +1954,12 @@ plot_rs_bird_age_fs <-
                     name = "Age",
                       labels = c("1 (N = 6)", "2 (N = 5)", "3 (N = 12)", 
                                  "4 (N = 13", "5 (N = 4)", "6 (N = 2)")) +
-  ggtitle("age-specific slopes\nof pre-basic moult timing (fixed)")
+  ggtitle("age-specific slopes of\npre-basic moult timing")
 
 plot_rs_bird_age + plot_rs_bird_age_fs
 ```
 
-inspect the random slopes against the raw data from photos
+inspect the random slopes against the raw data from photos - potential issues with data coverage over the moulting period?
 ```{r, echo=FALSE, fig.height=20}
 ggplot() + 
   geom_line(data = df_bird_age %>% 
@@ -2307,7 +2325,8 @@ mod_max_score_last_breeding_date <-
          (1 | rings_comb) + (1 | season),
        data = ind_prop_molt_scores_last_breeding_date)
 
-tbl_regression(mod_max_score_last_breeding_date, intercept = TRUE)
+tbl_regression(mod_max_score_last_breeding_date, intercept = TRUE, 
+               label = list(std_max_breeding_score ~ "max. breeding plumage score (sex-scaled)"))
 
 ggplot() +
   geom_line(data = as.data.frame(allEffects(mod_max_score_last_breeding_date))$std_max_breeding_score,
@@ -2340,7 +2359,8 @@ mod_max_score_first_breeding_date <-
          (1 | rings_comb) + (1 | season),
        data = ind_prop_molt_scores_first_breeding_date)
 
-tbl_regression(mod_max_score_first_breeding_date, intercept = TRUE)
+tbl_regression(mod_max_score_first_breeding_date, intercept = TRUE, 
+               label = list(std_max_breeding_score ~ "max. breeding plumage score (sex-scaled)"))
 
 ggplot() +
   geom_line(data = as.data.frame(allEffects(mod_max_score_first_breeding_date))$std_max_breeding_score,
@@ -2373,7 +2393,8 @@ mod_last_breeding_date_max_score <-
          (1 | rings_comb) + (1 | season),
        data = ind_prop_molt_scores_last_breeding_date)
 
-tbl_regression(mod_last_breeding_date_max_score, intercept = TRUE)
+tbl_regression(mod_last_breeding_date_max_score, intercept = TRUE, 
+               label = list(last_breeding_date_J_snum ~ "date last seen breeding (year-scaled)"))
 
 ggplot() +
   geom_line(data = as.data.frame(allEffects(mod_last_breeding_date_max_score))$last_breeding_date_J_snum,
@@ -2406,7 +2427,8 @@ mod_last_breeding_date_prop_molt_mid <-
          (1 | rings_comb) + (1 | season),
        data = ind_prop_molt_scores_last_breeding_date)
 
-tbl_regression(mod_last_breeding_date_prop_molt_mid, intercept = TRUE)
+tbl_regression(mod_last_breeding_date_prop_molt_mid, intercept = TRUE, 
+               label = list(last_breeding_date_J_snum ~ "date last seen breeding (year-scaled)"))
 
 ggplot() +
   geom_line(data = as.data.frame(allEffects(mod_last_breeding_date_prop_molt_mid))$last_breeding_date_J_snum,
@@ -2439,7 +2461,8 @@ mod_last_breeding_date_prop_molt_latest <-
         (1 | season),
        data = ind_prop_molt_scores_last_breeding_date)
 
-tbl_regression(mod_last_breeding_date_prop_molt_latest, intercept = TRUE)
+tbl_regression(mod_last_breeding_date_prop_molt_latest, intercept = TRUE, 
+               label = list(last_breeding_date_J_snum ~ "date last seen breeding (year-scaled)"))
 
 ggplot() +
   geom_line(data = as.data.frame(allEffects(mod_last_breeding_date_prop_molt_latest))$last_breeding_date_J_snum,
@@ -2536,3 +2559,16 @@ ggplot() +
 - drop pre-October data from the molt timing analysis.
 
 - next steps: Bashar to eventually write up this study as a report (which could eventually be used as his MSc thesis if he wants). Priority will be on him writing up a proposal for his thesis (which has a concrete deadline and is graded). Bashar will present the study at our weekly Monday meeting in the first few months of 2025.
+
+# Relevent papers to read and consider for manuscript
+- @gilbert2022late: Late breeding season definitive prebasic molt in males, and late breeding season brood care by females, in central California Wilson’s warblers
+
+- @drobniak2020seasonality: Seasonality, diet, and physiology as a predominant control factors of the moult dynamics in birds – a meta-analysis
+Figure 4 from their [pre-print](https://ecoevorxiv.org/repository/view/4403/) is relevant for the [age-specific](#within-individual-moult-dynamics-across-ages) timing we see:
+```{r, echo=FALSE}
+knitr::include_graphics("/Users/leberhart/ownCloud/kemp_projects/bdot/moult/figs/Screenshot 2025-01-28 at 09.42.13.png")
+```
+
+- @thompson1983molt: Molt-breeding overlap and timing of pre-basic molt in Texas Least Terns
+
+- @barta2008optimal: Optimal moult strategies in migratory birds
