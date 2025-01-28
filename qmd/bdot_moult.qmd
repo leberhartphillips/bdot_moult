@@ -168,7 +168,7 @@ get_mode <- function(x) {
 }
 ```
 
-## Main conclusions since last meeting in Nov, 2024
+## Main conclusions of study
 ### Breeding plumage
 - Sex difference in maximum rufous band score (strong effect) [Go to Results](#sex-specific-differences-in-breeding-plumage)
   - Males have a more full and immaculate rufous breast band than females
@@ -187,17 +187,19 @@ get_mode <- function(x) {
   - younger birds initiate their pre-basic moult earlier than older birds
 
 ### Links to breeding activity
-- No effect of maximum rufous band score on prolonged breeding [Go to Results](#effect-of-breeding-plumage-score-on-prolonged-breeding)
+- No effect of maximum rufous band score on prolonged breeding [Go to Results](#effect-of-breeding-plumage-score-on-prolonged-breeding) or last nest initiation date
 
 - No effect of maximum rufous band score on early breeding [Go to Results](#effect-of-breeding-plumage-score-on-early-breeding)
 
-- No effect of prolonged breeding on maximum rufous band score [Go to Results](#effect-of-prolonged-breeding-on-breeding-plumage-score)
+- No effect of prolonged breeding on maximum rufous band score [Go to Results](#effect-of-prolonged-breeding-on-breeding-plumage-score) or last nest initiation date
 
-- No effect of prolonged breeding and timing of moult [Go to Results](#effect-of-prolonged-breeding-on-moult)
+- No effect of prolonged breeding and timing of moult [Go to Results](#effect-of-prolonged-breeding-on-moult) or last nest initiation date 
 
 - Positive relationship between the date when an individual was last seen with its maximum breeding plumage and the date when it was last observed breeding [Go to Results](#effect-of-prolonged-breeding-on-prolonged-retention-of-full-plumage)
 
-- No age effect on prolonged breeding [Go to Results](#effect-of-age-on-prolonged-breeding)
+- No effect of late nest initiation on the last date an individual was seen with its maximum breeding plumage
+
+- No age effect on prolonged breeding [Go to Results](#effect-of-age-on-prolonged-breeding) or last nest initiation date
 
 - No age effect on early breeding [Go to Results](#effect-of-age-on-early-breeding)
 
