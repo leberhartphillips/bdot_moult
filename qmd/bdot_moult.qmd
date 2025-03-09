@@ -102,7 +102,8 @@ packages_required_in_project <- c("tidyverse",
                                   "glmmTMB",
                                   "sysfonts",
                                   "showtext",
-                                  "patchwork", "standardize")
+                                  "patchwork", "standardize",
+                                  "gridExtra")
 
 # of the required packages, check if some need to be installed
 new.packages <- 
@@ -212,7 +213,8 @@ This dataset contains the scored moult data for all usable photos from the 2021-
 ```{r, include = FALSE}
 # import data with all columns as character (so that no auto-formatting is done by R)
 dat <- 
-  read.csv("/Users/leberhart/ownCloud/kemp_projects/bdot/moult/data/Dataset_Molt_Final - modified 7.11.2024.csv", colClasses = "character") %>% 
+#  read.csv("/Users/leberhart/ownCloud/kemp_projects/bdot/moult/data/Dataset_Molt_Final - modified 7.11.2024.csv", colClasses = "character") %>% 
+  read.csv("data/Dataset_Molt_Final - modified 7.11.2024.csv", colClasses = "character") %>% 
   mutate(Rings_comb = str_sub(Rings_comb, 1, 4)) %>% 
   rename_with(tolower) # convert all column headers to lowercase
 
@@ -238,7 +240,8 @@ dat <-
 
 # import sex, migratory status, and age at banding information
 dat_sexes <- 
-  read.csv("/Users/leberhart/ownCloud/kemp_projects/bdot/moult/data/sex_status_banding.csv", colClasses = "character") %>% 
+#  read.csv("/Users/leberhart/ownCloud/kemp_projects/bdot/moult/data/sex_status_banding.csv", colClasses = "character") %>% 
+  read.csv("data/sex_status_banding.csv", colClasses = "character") %>% 
   mutate(Rings_comb = str_sub(Rings_comb, 1, 4)) %>% 
   rename_with(tolower) %>% # convert all column headers to lowercase
   distinct()
@@ -285,7 +288,8 @@ dat <-
     season_ringed = ifelse(age_at_banding  == "P" , 
                            ifelse(month(banding_date) < 7, year(banding_date) - 1, year(banding_date)),
                            NA),
-    age = ifelse(age_at_banding == "P", as.numeric(season - season_ringed), NA))# i should find a better way to calculate age
+    age = ifelse(age_at_banding == "P", as.numeric(season - season_ringed), NA))
+
 ```
 
 check max and min dates for each season
@@ -324,6 +328,18 @@ dat %>%
   arrange(desc(n_photos)) %>% 
   pivot_wider(., names_from = season, values_from = n_photos) %>% 
   datatable(class = 'cell-border stripe', rownames = FALSE, filter = 'top')
+```
+
+```{r, echo=FALSE}
+#  mean, and SD of photos for each individual per season
+dat %>% 
+  group_by(rings_comb, season) %>% 
+  summarise(n_photos = n()) %>%
+  ungroup() %>% 
+  mutate(sum_n = sum(n_photos),
+         mean_n = mean(n_photos),
+         sd_n = sd(n_photos))
+
 ```
 
 the final dataset
@@ -554,40 +570,6 @@ ggplot(dat_weekly_score, aes(x = start_of_week, y = mean_score, fill = sex)) +
 
 ```
 
-**Plot sexes separately**
-
-```{r}
-
-
-ggplot(dat_weekly_score, aes(x = start_of_week, y = mean_score, fill = sex)) +
-  geom_errorbar(aes(ymin = mean_score - sd_score, ymax = mean_score + sd_score), 
-                width = 3, position = position_dodge(width = 2)) +  
-  geom_point(shape = 21, size = 5, position = position_dodge(width = 2)) +
-  theme(legend.position = "none",
-        text = element_text(family = "Verdana"),
-        axis.ticks = element_blank(),
-        axis.text = element_text(size = 10, colour = "grey40"),
-        axis.title = element_text(size = 11, colour = "grey40"),
-        plot.margin = unit(c(0.2, 0.2, 0.2, 0.2), "cm"),
-        panel.spacing = unit(1, "cm"),
-        panel.background = element_rect(fill = 'transparent', color = NA),
-        plot.background = element_rect(fill = 'transparent', color = NA), 
-        strip.background = element_rect(fill = 'grey90', color = NA),
-        strip.text = element_blank(),  # This removes facet titles
-        panel.grid.major = element_line(size = 0.25, lineend = "round", colour = "grey90"),
-        panel.grid.minor = element_blank()) +
-  scale_x_date(date_labels = "%b %d", expand = c(0.01, 0.01), 
-               date_breaks = "4 week", 
-               limits = c(as.Date("2024-09-30"), as.Date("2025-05-01"))) + 
-  ylab("Mean Score (mean ± SD)") +
-  xlab("") + 
-  scale_fill_brewer(palette = "Set2", direction = -1) +
-  scale_y_continuous(limits = c(0, 7)) +
-  facet_wrap(~sex)
-
-
-```
-
 
 ### Seasonal changes in plumage score (monthly)
 
@@ -623,11 +605,11 @@ dat_monthly_score <- dat %>%
 
 ```{r}
 
-
+#png("D:/OneDrive/Desktop/My Files/IRT/Dotterel molt - IRT3/R/plots/seasonal_score_change.png", width = 2000, height = 1400, res = 300)
 ggplot(dat_monthly_score, aes(x = start_of_month, y = mean_score, fill = sex)) +
   geom_errorbar(aes(ymin = mean_score - sd_score, ymax = mean_score + sd_score), 
-                width = 5, position = position_dodge(width = 5)) +  
-  geom_point(shape = 21, size = 5, position = position_dodge(width = 5)) +
+                width = 5, position = position_dodge(width = 10)) +  
+  geom_point(shape = 21, size = 4.5, position = position_dodge(width = 10)) +
   theme(legend.position = "none",
         text = element_text(family = "Verdana"),
         axis.ticks = element_blank(),
@@ -641,14 +623,15 @@ ggplot(dat_monthly_score, aes(x = start_of_month, y = mean_score, fill = sex)) +
         strip.text = element_text(size = 13, colour = "grey40"),
         panel.grid.major = element_line(size = 0.25, lineend = "round", colour = "grey90"),
         panel.grid.minor = element_blank()) +
-  scale_x_date(date_labels = "%b %d", expand = c(0.01, 0.01), 
+  scale_x_date(date_labels = "%B", expand = c(0.01, 0.01), 
                date_breaks = "1 month", 
                limits = c(as.Date("2024-09-15"), as.Date("2025-04-20"))) + # Adjust for your desired date range
-  ylab("Mean Score (mean ± SD)") +
+  ylab("Rufous band score (mean ± SD)") +
   xlab("") + 
   scale_fill_brewer(palette = "Set2", direction = -1) +
   scale_y_continuous(limits = c(0, 7))
 
+#dev.off()
 
 ```
 
@@ -1695,11 +1678,11 @@ plot_rs_bird_sex <-
         panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90"),
         axis.title.x = element_blank()) +
   scale_y_continuous(limits = c(-0.05, 1.05)) +
-  ylab("proportion intact of individual-based maximum rufous band") +
+  ylab("Proportion intact of \nindividual-based maximum rufous band") +
   scale_x_date(date_labels = "%B", 
                expand = c(0.01, 0.01), 
                date_breaks = "1 month") +
-  ggtitle("random slopes of\npre-basic moult timing")
+  ggtitle("Random slopes of\npre-basic moult timing")
 
 # plot the model
 plot_rs_bird_fs_sex <- 
@@ -1735,7 +1718,7 @@ plot_rs_bird_fs_sex <-
         panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90"),
         axis.title.x = element_blank()) +
   scale_y_continuous(limits = c(-0.05, 1.05)) +
-  ylab("proportion intact of individual-based maximum rufous band") +
+  ylab("Proportion intact of \nindividual-based maximum rufous band") +
   scale_x_date(date_labels = "%B", 
                expand = c(0.01, 0.01), 
                date_breaks = "1 month") +
@@ -1745,9 +1728,14 @@ plot_rs_bird_fs_sex <-
   scale_fill_brewer(palette = "Dark2", direction = -1,
                     name = "Sex",
                     labels = c("Female (N = 49)", "Male (N = 32)")) +
-  ggtitle("sex-specific slopes\nof pre-basic moult timing")
+  ggtitle("Sex-specific slopes\nof pre-basic moult timing")
 
-plot_rs_bird_sex + plot_rs_bird_fs_sex 
+#png("D:/OneDrive/Desktop/My Files/IRT/Dotterel molt - IRT3/R/plots/moult_sex.png", width = 2400, height = 1600, res = 300)
+
+grid.arrange(plot_rs_bird_sex, plot_rs_bird_fs_sex, ncol = 2)
+
+#dev.off()
+
 ```
 
 ```{r, include=FALSE, eval=FALSE}
@@ -1920,11 +1908,11 @@ plot_rs_bird_status <-
         panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90"),
         axis.title.x = element_blank()) +
   scale_y_continuous(limits = c(-0.05, 1.05)) +
-  ylab("proportion intact of\nindividual-based maximum rufous band") +
+  ylab("Proportion intact of\nindividual-based maximum rufous band") +
   scale_x_date(date_labels = "%B", 
                expand = c(0.01, 0.01), 
                date_breaks = "1 month") +
-  ggtitle("random slopes of\npre-basic moult timing")
+  ggtitle("Random slopes of\npre-basic moult timing")
 
 # plot the model
 plot_rs_bird_status_fs <- 
@@ -1960,7 +1948,7 @@ plot_rs_bird_status_fs <-
         panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90"),
         axis.title.x = element_blank()) +
   scale_y_continuous(limits = c(-0.05, 1.05)) +
-  ylab("proportion intact of\nindividual-based maximum rufous band") +
+  ylab("Proportion intact of\nindividual-based maximum rufous band") +
   scale_x_date(date_labels = "%B", 
                expand = c(0.01, 0.01), 
                date_breaks = "1 month") +
@@ -1968,9 +1956,14 @@ plot_rs_bird_status_fs <-
                     labels = c("Migrant (N = 5)", "Resident (N = 16)")) +
   scale_fill_brewer(palette = "Set1",
                     labels = c("Migrant (N = 5)", "Resident (N = 16)")) +
-  ggtitle("status-specific slopes\nof pre-basic moult timing")
+  ggtitle("Status-specific slopes\nof pre-basic moult timing")
 
-plot_rs_bird_status + plot_rs_bird_status_fs
+#png("D:/OneDrive/Desktop/My Files/IRT/Dotterel molt - IRT3/R/plots/moult_status.png", width = 2400, height = 1600, res = 300)
+
+grid.arrange(plot_rs_bird_status, plot_rs_bird_status_fs, ncol = 2)
+
+#dev.off()
+
 ```
 
 ### Within-individual moult dynamics across ages
@@ -2065,11 +2058,11 @@ plot_rs_bird_age <-
         panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90"),
         axis.title.x = element_blank()) +
   scale_y_continuous(limits = c(-0.05, 1.05)) +
-  ylab("proportion intact of\nindividual-based maximum rufous band") +
+  ylab("Proportion intact of\nindividual-based maximum rufous band") +
   scale_x_date(date_labels = "%B", 
                expand = c(0.01, 0.01), 
                date_breaks = "1 month") +
-  ggtitle("random slopes of\npre-basic moult timing")
+  ggtitle("Random slopes of\npre-basic moult timing")
 
 # plot the model
 plot_rs_bird_age_fs <- 
@@ -2105,7 +2098,7 @@ plot_rs_bird_age_fs <-
         panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90"),
         axis.title.x = element_blank()) +
   scale_y_continuous(limits = c(-0.05, 1.05)) +
-  ylab("proportion intact of\nindividual-based maximum rufous band") +
+  ylab("Proportion intact of\nindividual-based maximum rufous band") +
   scale_x_date(date_labels = "%B", 
                expand = c(0.01, 0.01), 
                date_breaks = "1 month") +
@@ -2117,9 +2110,14 @@ plot_rs_bird_age_fs <-
                     name = "Age",
                       labels = c("1 (N = 6)", "2 (N = 5)", "3 (N = 12)", 
                                  "4 (N = 13", "5 (N = 4)", "6 (N = 2)")) +
-  ggtitle("age-specific slopes of\npre-basic moult timing")
+  ggtitle("Age-specific slopes of\npre-basic moult timing")
 
-plot_rs_bird_age + plot_rs_bird_age_fs
+#png("D:/OneDrive/Desktop/My Files/IRT/Dotterel molt - IRT3/R/plots/moult_age.png", width = 2400, height = 1600, res = 300)
+
+grid.arrange(plot_rs_bird_age, plot_rs_bird_age_fs, ncol = 2)
+
+#dev.off()
+
 ```
 
 inspect the random slopes against the raw data from photos - potential issues with data coverage over the moulting period?
@@ -2169,7 +2167,8 @@ ggplot() +
 ## 2021 season
 # import and consolidate key columns
 breeding_data_2021 <- 
-  read_excel("/Users/leberhart/ownCloud/kemp_projects/bdot/moult/data/Kaikoura_Dotterel_2021_Feb2022_upd_Nov22_Locations.xlsx", 
+  #read_excel("/Users/leberhart/ownCloud/kemp_projects/bdot/moult/data/Kaikoura_Dotterel_2021_Feb2022_upd_Nov22_Locations.xlsx", 
+  read_excel("data/Kaikoura_Dotterel_2021_Feb2022_upd_Nov22_Locations.xlsx",
                      sheet = "Kaikoura_NestVisit2021_1", 
                      col_types = "text") %>%
   mutate(visit_date_ = as.POSIXct(as.numeric(`Visit Date`) * 86400, origin = "1899-12-30", tz = "UTC")) %>% 
@@ -2243,7 +2242,8 @@ breeding_data_2021 <-
 
 # import and consolidate key columns
 breeding_data_2021_ <-
-  read_excel("/Users/leberhart/ownCloud/kemp_projects/bdot/moult/data/Kaikoura_Dotterel_2021_Feb2022_upd_Nov22_Locations.xlsx", 
+#  read_excel("/Users/leberhart/ownCloud/kemp_projects/bdot/moult/data/Kaikoura_Dotterel_2021_Feb2022_upd_Nov22_Locations.xlsx", 
+  read_excel("data/Kaikoura_Dotterel_2021_Feb2022_upd_Nov22_Locations.xlsx",
                      sheet = "Kaikoura_DotterelNest2021_0", 
                      col_types = "text") %>%
   mutate(hatch_date_ = as.POSIXct(as.numeric(`Date Hatched`) * 86400, origin = "1899-12-30", tz = "UTC"),
@@ -2291,7 +2291,8 @@ breeding_2021_final <-
 
 # import and consolidate key columns
 breeding_data_2022 <- 
-  read_excel("/Users/leberhart/ownCloud/kemp_projects/bdot/moult/data/Kaikoura_Dotterel_Jan23_upd.xlsx", 
+  #read_excel("/Users/leberhart/ownCloud/kemp_projects/bdot/moult/data/Kaikoura_Dotterel_Jan23_upd.xlsx", 
+  read_excel("data/Kaikoura_Dotterel_Jan23_upd.xlsx",
                      sheet = "Kaikoura_NestVisit_1", 
                      col_types = "text") %>%
   mutate(visit_date_ = as.POSIXct(as.numeric(`Visit Date`) * 86400, origin = "1899-12-30", tz = "UTC")) %>% 
@@ -2342,7 +2343,8 @@ breeding_data_2022 <-
 
 # import and consolidate key columns
 breeding_data_2022_ <-
-  read_excel("/Users/leberhart/ownCloud/kemp_projects/bdot/moult/data/Kaikoura_Dotterel_Jan23_upd.xlsx", 
+  #read_excel("/Users/leberhart/ownCloud/kemp_projects/bdot/moult/data/Kaikoura_Dotterel_Jan23_upd.xlsx", 
+   read_excel("data/Kaikoura_Dotterel_Jan23_upd.xlsx",          
                      sheet = "Kaikoura_DotterelNest_0", 
                      col_types = "text") %>%
   mutate(hatch_date_ = as.POSIXct(as.numeric(`Date Hatched`) * 86400, origin = "1899-12-30", tz = "UTC"),
@@ -2390,7 +2392,8 @@ breeding_2022_final <- left_join(breeding_data_2022, breeding_data_2022_, by = "
 
 # import and consolidate key columns
 breeding_data_2023 <- 
-  read_excel("/Users/leberhart/ownCloud/kemp_projects/bdot/moult/data/Kaikoura_Dotterel_Feb2024_upd.xlsx", 
+  #read_excel("/Users/leberhart/ownCloud/kemp_projects/bdot/moult/data/Kaikoura_Dotterel_Feb2024_upd.xlsx", 
+   read_excel("data/Kaikoura_Dotterel_Feb2024_upd.xlsx",          
                      sheet = "Kaikoura_NestVisit_1", 
                      col_types = "text") %>%
   mutate(visit_date_ = as.POSIXct(as.numeric(`Visit Date`) * 86400, origin = "1899-12-30", tz = "UTC")) %>% 
@@ -2441,7 +2444,8 @@ breeding_data_2023 <-
 
 # import and consolidate key columns
 breeding_data_2023_ <-
-  read_excel("/Users/leberhart/ownCloud/kemp_projects/bdot/moult/data/Kaikoura_Dotterel_Feb2024_upd.xlsx", 
+  #read_excel("/Users/leberhart/ownCloud/kemp_projects/bdot/moult/data/Kaikoura_Dotterel_Feb2024_upd.xlsx",
+    read_excel("data/Kaikoura_Dotterel_Feb2024_upd.xlsx",         
                      sheet = "Kaikoura_DotterelNest_0", 
                      col_types = "text") %>%
     mutate(hatch_date_ = as.POSIXct(as.numeric(`Date Hatched`) * 86400, origin = "1899-12-30", tz = "UTC"),
@@ -2716,7 +2720,7 @@ mod_last_breeding_date_prop_molt_mid <-
 tbl_regression(mod_last_breeding_date_prop_molt_mid, intercept = TRUE, 
                label = list(last_breeding_date_J_snum ~ "date last seen breeding (year-scaled)"))
 
-ggplot() +
+plot_last_breeding_date_prop_molt_mid <- ggplot() +
   geom_line(data = as.data.frame(allEffects(mod_last_breeding_date_prop_molt_mid))$last_breeding_date_J_snum,
             aes(x = last_breeding_date_J_snum, y = fit)) +
   geom_ribbon(data = as.data.frame(allEffects(mod_last_breeding_date_prop_molt_mid))$last_breeding_date_J_snum,
@@ -2734,8 +2738,10 @@ ggplot() +
         panel.grid.major.y = element_line(size = 0.25, lineend = "round", colour = "grey90"),
         panel.grid.minor = element_blank(),
         panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90")) +
-  xlab("year-scaled date of last breeding attempt") +
-  ylab("mid-point date between\nlast max score photo and first photo during moult")
+  xlab("Year-scaled date of last breeding attempt") +
+  ylab("")
+
+
 ```
 
 #### effect of late nest initiation on moult
@@ -2749,7 +2755,7 @@ mod_late_initiation_date_prop_molt_mid <-
 tbl_regression(mod_late_initiation_date_prop_molt_mid, intercept = TRUE, 
                label = list(last_nest_first_obs_J_snum ~ "initiation date of last nest (year-scaled)"))
 
-ggplot() +
+plot_late_initiation_date_prop_molt_mid <- ggplot() +
   geom_line(data = as.data.frame(allEffects(mod_late_initiation_date_prop_molt_mid))$last_nest_first_obs_J_snum,
             aes(x = last_nest_first_obs_J_snum, y = fit)) +
   geom_ribbon(data = as.data.frame(allEffects(mod_late_initiation_date_prop_molt_mid))$last_nest_first_obs_J_snum,
@@ -2767,9 +2773,24 @@ ggplot() +
         panel.grid.major.y = element_line(size = 0.25, lineend = "round", colour = "grey90"),
         panel.grid.minor = element_blank(),
         panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90")) +
-  xlab("year-scaled intiation date of last nest") +
-  ylab("mid-point date between\nlast max score photo and first photo during moult")
+  xlab("Year-scaled intiation date of last nest") +
+  ylab("Mid-point date between\nlast max score photo and first photo during moult")
 ```
+
+
+Plot together
+```{r}
+
+#png("D:/OneDrive/Desktop/My Files/IRT/Dotterel molt - IRT3/R/plots/moult_breeding.png", width = 2600, height = 1400, res = 300)
+
+grid.arrange(plot_late_initiation_date_prop_molt_mid, plot_last_breeding_date_prop_molt_mid, ncol = 2)
+
+#dev.off()
+
+
+```
+
+
 
 #### effect of prolonged breeding on prolonged retention of full plumage
 do individuals with late breeding attempts retain their full breeding plumage longer?
