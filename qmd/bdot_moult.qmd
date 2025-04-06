@@ -2215,12 +2215,12 @@ plot_rs_bird_age_fs <-
                date_breaks = "1 month") +
   scale_colour_brewer(palette = "Spectral", direction = -1,
                       name = "Age",
-                      labels = c("1 (N = 6)", "2 (N = 5)", "3 (N = 12)", 
-                                 "4 (N = 13", "5 (N = 4)", "6 (N = 2)")) +
+                      labels = c("1 (N = 6)", "2 (N = 4)", "3 (N = 12)", 
+                                 "4 (N = 11)", "5 (N = 4)", "6 (N = 2)")) +
   scale_fill_brewer(palette = "Spectral", direction = -1,
                     name = "Age",
-                      labels = c("1 (N = 6)", "2 (N = 5)", "3 (N = 12)", 
-                                 "4 (N = 13", "5 (N = 4)", "6 (N = 2)")) +
+                      labels = c("1 (N = 6)", "2 (N = 4)", "3 (N = 12)", 
+                                 "4 (N = 11)", "5 (N = 4)", "6 (N = 2)")) +
   ggtitle("(B)")
 
 #png("D:/OneDrive/Desktop/My Files/IRT/Dotterel molt - IRT3/R/plots/moult_age.png", width = 2400, height = 1600, res = 300)
@@ -2271,6 +2271,79 @@ ggplot() +
   facet_wrap("id_year", ncol = 3) #+
   # scale_colour_brewer(palette = "Spectral", direction = -1)
 ```
+
+Get the start and end date of the moult
+```{r}
+
+
+# Extract fixed and random effects
+fixed_effects <- fixef(mod_moult_age_bird_RIS)
+random_effects <- ranef(mod_moult_age_bird_RIS)$ring_season
+
+# Define start and end probability thresholds
+t_start <- 0.975
+t_end <- 0.025
+logit_start <- qlogis(t_start)
+logit_end <- qlogis(t_end)
+
+# Initialize results dataframe
+results_age <- data.frame()
+
+
+
+# Loop through each ring_season and age
+for (rs in rownames(random_effects)) {
+  # Random effects for this ring_season
+  b0_ring <- random_effects[rs, "(Intercept)"]  # Random intercept
+  b_date_ring <- random_effects[rs, "date_J"]   # Random slope for date_J
+  
+  # Total slope (fixed + random)
+  total_slope <- fixed_effects["date_J"] + b_date_ring
+  
+  # Loop through ages 1-6
+  for (age_val in 1:6) {
+    # Total intercept = fixed_intercept + random_intercept + (age_coef * age_value)
+    total_intercept <- fixed_effects["(Intercept)"] + b0_ring + (fixed_effects["age"] * age_val)
+    
+    # Calculate dates
+    start_date_J <- (logit_start - total_intercept) / total_slope
+    end_date_J <- (logit_end - total_intercept) / total_slope
+    duration <- end_date_J - start_date_J
+
+    results_age <- rbind(results_age, data.frame(
+      ring_season = rs,
+      age = age_val,
+      start_date_J,
+      end_date_J,
+      duration
+    ))
+  }
+}
+
+
+
+summary_age <- results_age %>%
+  group_by(age) %>%
+  summarise(
+    mean_start = mean(start_date_J, na.rm = TRUE),
+    sd_start = sd(start_date_J, na.rm = TRUE),
+    mean_end = mean(end_date_J, na.rm = TRUE),
+    sd_end = sd(end_date_J, na.rm = TRUE),
+    duration = mean(duration, na.rm = TRUE)
+  )
+
+print(summary_age)
+
+
+
+ggplot(mod_moult_age_bird_RIS_fits, aes(x = date_J, y = predicted)) +
+  geom_point()+
+  geom_vline(data = summary_age, aes(xintercept = mean_start)) +
+  geom_vline(data = summary_age, aes(xintercept = mean_end), linetype = "dashed")
+
+
+```
+
 
 ## Breeding status analysis
 ```{r, include=FALSE}
