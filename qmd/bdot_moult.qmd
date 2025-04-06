@@ -368,7 +368,7 @@ dat %>%
 #### 2021-2022 season data
 ```{r, fig.height=9, echo=FALSE}
 # 2021-2022 season data
-ggplot(data = dat %>% filter(season == 2021 & sex == "F") %>% mutate(score = as.numeric(score), 
+female_2021 <- ggplot(data = dat %>% filter(season == 2021 & sex == "F") %>% mutate(score = as.numeric(score), 
                                                                      rings_comb_ = reorder(rings_comb, n_photos, decreasing = TRUE))) +
   geom_point(aes(y = 1, x = date, fill = score), 
              pch = 21, color = "black", size = 3) +
@@ -389,10 +389,14 @@ ggplot(data = dat %>% filter(season == 2021 & sex == "F") %>% mutate(score = as.
                limits = c(as.Date("2021-07-05"), as.Date("2022-05-01"))) +
   xlab("week") +
   ggtitle("Females from the 2021-2022 breeding season in Kaikoura")
+
+
+female_2021
+
 ```
 
 ```{r, fig.height=8, echo=FALSE}
-ggplot(data = dat %>% filter(season == 2021 & sex == "M") %>% mutate(score = as.numeric(score))) +
+male_2021 <- ggplot(data = dat %>% filter(season == 2021 & sex == "M") %>% mutate(score = as.numeric(score))) +
   geom_point(aes(y = 1, x = date, fill = score), 
              pch = 21, color = "black", size = 3) +
   facet_wrap(. ~ reorder(rings_comb, n_photos, decreasing = TRUE), ncol = 1, strip.position = "right") +
@@ -412,12 +416,25 @@ ggplot(data = dat %>% filter(season == 2021 & sex == "M") %>% mutate(score = as.
                limits = c(as.Date("2021-07-05"), as.Date("2022-05-01"))) +
   xlab("week") +
   ggtitle("Males from the 2021-2022 breeding season in Kaikoura")
+
+male_2021
+
+```
+
+```{r, include=FALSE, eval=FALSE}
+
+png("D:/OneDrive/Desktop/My Files/IRT/Dotterel molt - IRT3/R/plots/data_2021.png", width = 3000, height = 2500, res = 300)
+
+grid.arrange(female_2021, male_2021, ncol = 2)
+
+dev.off()
+
 ```
 
 #### 2022-2023 season data
 ```{r, fig.height=10, echo=FALSE}
 # 2022-2023 season data (not as good coverage as the previous season)
-ggplot(data = dat %>% filter(season == 2022 & sex == "F") %>% mutate(score = as.numeric(score))) +
+female_2022 <- ggplot(data = dat %>% filter(season == 2022 & sex == "F") %>% mutate(score = as.numeric(score))) +
   geom_point(aes(y = 1, x = date, fill = score), 
              pch = 21, color = "black", size = 3) +
   facet_wrap(. ~ reorder(rings_comb, n_photos, decreasing = TRUE), ncol = 1, strip.position = "right") +
@@ -437,10 +454,13 @@ ggplot(data = dat %>% filter(season == 2022 & sex == "F") %>% mutate(score = as.
                limits = c(as.Date("2022-07-05"), as.Date("2023-05-01"))) +
   xlab("week") +
   ggtitle("Females from the 2022-2023 breeding season in Kaikoura")
+
+female_2022
+
 ```
 
 ```{r, fig.height=7, echo=FALSE}
-ggplot(data = dat %>% filter(season == 2022 & sex == "M") %>% mutate(score = as.numeric(score))) +
+male_2022 <- ggplot(data = dat %>% filter(season == 2022 & sex == "M") %>% mutate(score = as.numeric(score))) +
   geom_point(aes(y = 1, x = date, fill = score), 
              pch = 21, color = "black", size = 3) +
   facet_wrap(. ~ reorder(rings_comb, n_photos, decreasing = TRUE), ncol = 1, strip.position = "right") +
@@ -460,12 +480,25 @@ ggplot(data = dat %>% filter(season == 2022 & sex == "M") %>% mutate(score = as.
                limits = c(as.Date("2022-07-05"), as.Date("2023-05-01"))) +
   xlab("week") +
   ggtitle("Males from the 2022-2023 breeding season in Kaikoura")
+
+male_2022
+
+```
+
+```{r, include=FALSE, eval=FALSE}
+
+png("D:/OneDrive/Desktop/My Files/IRT/Dotterel molt - IRT3/R/plots/data_2022.png", width = 3000, height = 2500, res = 300)
+
+grid.arrange(female_2022, male_2022, ncol = 2)
+
+dev.off()
+
 ```
 
 #### 2023-2024 season data
 ```{r, fig.height=10, echo=FALSE}
 # 2023-2024 season data 
-ggplot(data = dat %>% filter(season == 2023 & sex == "F") %>% mutate(score = as.numeric(score))) +
+female_2023 <- ggplot(data = dat %>% filter(season == 2023 & sex == "F") %>% mutate(score = as.numeric(score))) +
   geom_point(aes(y = 1, x = date, fill = score), 
              pch = 21, color = "black", size = 3) +
   facet_wrap(. ~ reorder(rings_comb, n_photos, decreasing = TRUE), ncol = 1, strip.position = "right") +
@@ -485,10 +518,13 @@ ggplot(data = dat %>% filter(season == 2023 & sex == "F") %>% mutate(score = as.
                limits = c(as.Date("2023-07-01"), as.Date("2024-05-01"))) +
   xlab("week") +
   ggtitle("Females from the 2023-2024 breeding season in Kaikoura")
+
+female_2023
+
 ```
 
 ```{r, fig.height=6, echo=FALSE}
-ggplot(data = dat %>% filter(season == 2023 & sex == "M") %>% mutate(score = as.numeric(score))) +
+male_2023 <- ggplot(data = dat %>% filter(season == 2023 & sex == "M") %>% mutate(score = as.numeric(score))) +
   geom_point(aes(y = 1, x = date, fill = score), 
              pch = 21, color = "black", size = 3) +
   facet_wrap(. ~ reorder(rings_comb, n_photos, decreasing = TRUE), ncol = 1, strip.position = "right") +
@@ -508,6 +544,19 @@ ggplot(data = dat %>% filter(season == 2023 & sex == "M") %>% mutate(score = as.
                limits = c(as.Date("2023-07-05"), as.Date("2024-05-01"))) +
   xlab("week") +
   ggtitle("Males from the 2023-2024 breeding season in Kaikoura")
+
+male_2023
+
+```
+
+```{r, include=FALSE, eval=FALSE}
+
+png("D:/OneDrive/Desktop/My Files/IRT/Dotterel molt - IRT3/R/plots/data_2023.png", width = 3000, height = 2500, res = 300)
+
+grid.arrange(female_2023, male_2023, ncol = 2)
+
+dev.off()
+
 ```
 
 ### Seasonal changes in plumage score (week)
@@ -1598,7 +1647,7 @@ mixed effects binomial model assessing sex-differences in the timing of pre-basi
 ```{r}
 mod_moult_sex_bird_RIS <- 
   lme4::glmer(prop_molt_score_max ~ 
-                date_J + sex + 
+                date_J  + sex +
          (date_J | ring_season),
        data = ind_prop_molt_scores, 
        family = binomial)
@@ -1608,6 +1657,7 @@ mod_moult_sex_bird_RIS <-
 tbl_regression(mod_moult_sex_bird_RIS, intercept = TRUE, 
                label = list(date_J ~ "Date", sex ~ "Sex"))
 ```
+
 
 ```{r, echo=FALSE}
 RIS_bird_sex <- 
@@ -1676,13 +1726,14 @@ plot_rs_bird_sex <-
         panel.grid.major.y = element_line(size = 0.25, lineend = "round", colour = "grey90"),
         panel.grid.minor = element_blank(),
         panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90"),
-        axis.title.x = element_blank()) +
+        axis.title.x = element_blank(), 
+        plot.title = element_text(size = 12, hjust = -0.15)) +
   scale_y_continuous(limits = c(-0.05, 1.05)) +
   ylab("Proportion intact of \nindividual-based maximum rufous band") +
   scale_x_date(date_labels = "%B", 
                expand = c(0.01, 0.01), 
                date_breaks = "1 month") +
-  ggtitle("Random slopes of\npre-basic moult timing")
+  ggtitle("(A)")
 
 # plot the model
 plot_rs_bird_fs_sex <- 
@@ -1716,7 +1767,8 @@ plot_rs_bird_fs_sex <-
         panel.grid.major.y = element_line(size = 0.25, lineend = "round", colour = "grey90"),
         panel.grid.minor = element_blank(),
         panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90"),
-        axis.title.x = element_blank()) +
+        axis.title.x = element_blank(),
+        plot.title = element_text(size = 12, hjust = -0.08)) +
   scale_y_continuous(limits = c(-0.05, 1.05)) +
   ylab("Proportion intact of \nindividual-based maximum rufous band") +
   scale_x_date(date_labels = "%B", 
@@ -1728,7 +1780,7 @@ plot_rs_bird_fs_sex <-
   scale_fill_brewer(palette = "Dark2", direction = -1,
                     name = "Sex",
                     labels = c("Female (N = 49)", "Male (N = 32)")) +
-  ggtitle("Sex-specific slopes\nof pre-basic moult timing")
+  ggtitle("(B)")
 
 #png("D:/OneDrive/Desktop/My Files/IRT/Dotterel molt - IRT3/R/plots/moult_sex.png", width = 2400, height = 1600, res = 300)
 
@@ -1737,6 +1789,63 @@ grid.arrange(plot_rs_bird_sex, plot_rs_bird_fs_sex, ncol = 2)
 #dev.off()
 
 ```
+
+Get the start and end date of the moult
+```{r}
+
+# Extract coefficients for each ring_season
+coefs <- coef(mod_moult_sex_bird_RIS)$ring_season
+
+# Define start and end probability thresholds
+t_start <- 0.975
+t_end <- 0.025
+logit_start <- qlogis(t_start)  # Logit transformation
+logit_end <- qlogis(t_end)
+
+# Calculate start and end dates for each ring_season
+start_date_J <- (logit_start - coefs[, "(Intercept)"]) / coefs[, "date_J"]
+end_date_J <- (logit_end - coefs[, "(Intercept)"]) / coefs[, "date_J"]
+
+# Combine results into a data frame
+moult_time <- data.frame(
+  ring_season = rownames(coefs),
+  start_date_J,
+  end_date_J
+) %>% 
+  mutate(duration = end_date_J- start_date_J)
+
+# Calculate mean and SD for start dates
+mean_start <- mean(moult_time$start_date_J, na.rm = TRUE)
+sd_start <- sd(moult_time$start_date_J, na.rm = TRUE)
+
+# Calculate mean and SD for end dates
+mean_end <- mean(moult_time$end_date_J, na.rm = TRUE)
+sd_end <- sd(moult_time$end_date_J, na.rm = TRUE)
+
+
+# Calculate mean and SD for duration
+mean_duration <- mean(moult_time$duration, na.rm = TRUE)
+sd_duration <- sd(moult_time$duration, na.rm = TRUE)
+
+# Combine into a table
+timing_mean_sd <- data.frame(
+  Metric = c("Start Date", "End Date", "Duration"),
+  Mean = c(mean_start, mean_end, mean_duration),
+  SD = c(sd_start, sd_end, sd_duration)
+)
+
+print(timing_mean_sd)
+
+# start: 176 --> 360 --> 26 Dec
+# end: 247 --> 66 --> 7 March
+
+
+#ggplot(mod_moult_sex_bird_RIS_fits, aes(x = date_J, y = predicted)) +
+ # geom_point()+
+  #geom_vline(xintercept = c(mean_start, mean_end))
+
+```
+
 
 ```{r, include=FALSE, eval=FALSE}
 # # quick look at effect
@@ -2056,13 +2165,14 @@ plot_rs_bird_age <-
         panel.grid.major.y = element_line(size = 0.25, lineend = "round", colour = "grey90"),
         panel.grid.minor = element_blank(),
         panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90"),
-        axis.title.x = element_blank()) +
+        axis.title.x = element_blank(),
+        plot.title = element_text(size = 12, hjust = -0.15)) +
   scale_y_continuous(limits = c(-0.05, 1.05)) +
   ylab("Proportion intact of\nindividual-based maximum rufous band") +
   scale_x_date(date_labels = "%B", 
                expand = c(0.01, 0.01), 
                date_breaks = "1 month") +
-  ggtitle("Random slopes of\npre-basic moult timing")
+  ggtitle("(A)")
 
 # plot the model
 plot_rs_bird_age_fs <- 
@@ -2096,7 +2206,8 @@ plot_rs_bird_age_fs <-
         panel.grid.major.y = element_line(size = 0.25, lineend = "round", colour = "grey90"),
         panel.grid.minor = element_blank(),
         panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90"),
-        axis.title.x = element_blank()) +
+        axis.title.x = element_blank(),
+        plot.title = element_text(size = 12, hjust = -0.08)) +
   scale_y_continuous(limits = c(-0.05, 1.05)) +
   ylab("Proportion intact of\nindividual-based maximum rufous band") +
   scale_x_date(date_labels = "%B", 
@@ -2110,7 +2221,7 @@ plot_rs_bird_age_fs <-
                     name = "Age",
                       labels = c("1 (N = 6)", "2 (N = 5)", "3 (N = 12)", 
                                  "4 (N = 13", "5 (N = 4)", "6 (N = 2)")) +
-  ggtitle("Age-specific slopes of\npre-basic moult timing")
+  ggtitle("(B)")
 
 #png("D:/OneDrive/Desktop/My Files/IRT/Dotterel molt - IRT3/R/plots/moult_age.png", width = 2400, height = 1600, res = 300)
 
@@ -2731,15 +2842,17 @@ plot_last_breeding_date_prop_molt_mid <- ggplot() +
               alpha = 1, shape = 20) +
   theme(text = element_text(family = "Verdana"),
         axis.ticks = element_blank(),
-        plot.margin = unit(c(0.2,0.2,0.2,0.2), "cm"),
+        plot.margin = unit(c(0.2,0.3,0.2,0.3), "cm"),
         panel.spacing = unit(1, "cm"),
+        plot.title = element_text(size = 14, hjust = -0.18),
         panel.background = element_rect(fill = 'transparent', color = NA),
         plot.background = element_rect(fill = 'transparent', color = NA), 
         panel.grid.major.y = element_line(size = 0.25, lineend = "round", colour = "grey90"),
         panel.grid.minor = element_blank(),
         panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90")) +
   xlab("Year-scaled date of last breeding attempt") +
-  ylab("")
+  ylab("Mid-point date between\nlast max score photo and first photo during moult")+
+  labs(title = "(B)")
 
 
 ```
@@ -2766,30 +2879,19 @@ plot_late_initiation_date_prop_molt_mid <- ggplot() +
               alpha = 1, shape = 20) +
   theme(text = element_text(family = "Verdana"),
         axis.ticks = element_blank(),
-        plot.margin = unit(c(0.2,0.2,0.2,0.2), "cm"),
+        plot.margin = unit(c(0.2,0.3,0.2,0.3), "cm"),
         panel.spacing = unit(1, "cm"),
+        plot.title = element_text(size = 14, hjust = -0.18),
         panel.background = element_rect(fill = 'transparent', color = NA),
         plot.background = element_rect(fill = 'transparent', color = NA), 
         panel.grid.major.y = element_line(size = 0.25, lineend = "round", colour = "grey90"),
         panel.grid.minor = element_blank(),
         panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90")) +
   xlab("Year-scaled intiation date of last nest") +
-  ylab("Mid-point date between\nlast max score photo and first photo during moult")
-```
-
-
-Plot together
-```{r}
-
-#png("D:/OneDrive/Desktop/My Files/IRT/Dotterel molt - IRT3/R/plots/moult_breeding.png", width = 2600, height = 1400, res = 300)
-
-grid.arrange(plot_late_initiation_date_prop_molt_mid, plot_last_breeding_date_prop_molt_mid, ncol = 2)
-
-#dev.off()
-
+  ylab("Mid-point date between\nlast max score photo and first photo during moult")+
+  labs(title = "(A)")
 
 ```
-
 
 
 #### effect of prolonged breeding on prolonged retention of full plumage
@@ -2804,7 +2906,7 @@ mod_last_breeding_date_prop_molt_latest <-
 tbl_regression(mod_last_breeding_date_prop_molt_latest, intercept = TRUE, 
                label = list(last_breeding_date_J_snum ~ "date last seen breeding (year-scaled)"))
 
-ggplot() +
+breeding_plumage_retention <- ggplot() +
   geom_line(data = as.data.frame(allEffects(mod_last_breeding_date_prop_molt_latest))$last_breeding_date_J_snum,
             aes(x = last_breeding_date_J_snum, y = fit)) +
   geom_ribbon(data = as.data.frame(allEffects(mod_last_breeding_date_prop_molt_latest))$last_breeding_date_J_snum,
@@ -2815,16 +2917,33 @@ ggplot() +
               alpha = 1, shape = 20) +
   theme(text = element_text(family = "Verdana"),
         axis.ticks = element_blank(),
-        plot.margin = unit(c(0.2,0.2,0.2,0.2), "cm"),
+        plot.title = element_text(size = 14, hjust = -0.18),
+        plot.margin = unit(c(0.2,0.3,0.2,0.3), "cm"),
         panel.spacing = unit(1, "cm"),
         panel.background = element_rect(fill = 'transparent', color = NA),
         plot.background = element_rect(fill = 'transparent', color = NA), 
         panel.grid.major.y = element_line(size = 0.25, lineend = "round", colour = "grey90"),
         panel.grid.minor = element_blank(),
         panel.grid.major.x = element_line(size = 0.25, lineend = "round", colour = "grey90")) +
-  xlab("year-scaled date of last breeding attempt") +
-  ylab("last date photographed with max score")
+  xlab("Year-scaled date of last breeding attempt") +
+  ylab("Last date photographed with max score")+
+  labs(title = "(C)")
+
 ```
+
+
+Plot together
+```{r}
+
+png("D:/OneDrive/Desktop/My Files/IRT/Dotterel molt - IRT3/R/plots/moult_breeding.png", width = 4000, height = 1500, res = 300)
+
+grid.arrange(plot_late_initiation_date_prop_molt_mid, plot_last_breeding_date_prop_molt_mid, breeding_plumage_retention, ncol = 3)
+
+dev.off()
+
+
+```
+
 
 #### effect of late nest initation on prolonged retention of full plumage
 do individuals with late nest initiation retain their full breeding plumage longer? No Effect
