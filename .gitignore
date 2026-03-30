@@ -1,49 +1,39 @@
-# History files
-.Rhistory
-.Rapp.history
+# Ignore everything by default
+*
 
-# Session Data files
-.RData
-.RDataTmp
+# Re-open directories so specific files below can be unignored
+!*/
 
-# User-specific files
-.Ruserdata
+# Keep repo metadata and top-level reproducibility files
+!.gitignore
+!README.md
+!LICENSE
+!moult.Rproj
+!banded_dotterel_moult.qmd
+!banded_dotterel_moult.html
 
-# Example code in package build process
-*-Ex.R
+# Keep figure used in the README
+!figs/fig2.png
 
-# Output files from R CMD build
-/*.tar.gz
+# Keep input data objects sourced by the Quarto document
+!data/moult_breeding_KK_data.rds
+!data/breeding_KK_data.rds
+!data/nests_KK_data.rds
 
-# Output files from R CMD check
-/*.Rcheck/
-
-# RStudio files
-.Rproj.user/
-
-# produced vignettes
-vignettes/*.html
-vignettes/*.pdf
-
-# OAuth2 token, see https://github.com/hadley/httr/releases/tag/v0.3
-.httr-oauth
-
-# knitr and R markdown default cache directories
-*_cache/
-/cache/
-
-# Temporary files created by R markdown
-*.utf8.md
-*.knit.md
-
-# R Environment Variables
-.Renviron
-
-# pkgdown site
-docs/
-
-# translation temp files
-po/*~
-
-# RStudio Connect folder
-rsconnect/
+# Keep model/result objects sourced by the Quarto document
+!out/sex_mod.rds
+!out/sex_all_3_breed_mod.rds
+!out/sex_age_class_mod.rds
+!out/sex_age_avg_mod.rds
+!out/sex_migratory_status_mod.rds
+!out/kfc_age_class.rds
+!out/kfc_age_avg.rds
+!out/mod_mig_lay_brms.rds
+!out/mod_mig_first_brms.rds
+!out/mod_mig_last_brms.rds
+!out/mod_age_lay_brms.rds
+!out/mod_age_first_brms.rds
+!out/mod_age_last_brms.rds
+!out/mod_age2_lay_brms.rds
+!out/mod_age2_first_brms.rds
+!out/mod_age2_last_brms.rds
