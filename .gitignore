@@ -23,8 +23,12 @@
 # Keep model/result objects sourced by the Quarto document
 !out/sex_mod.rds
 !out/sex_all_3_breed_mod.rds
+!out/sex_all_3_breed_mod2.rds
+!out/sex_all_3_breed_mod3.rds
 !out/sex_age_class_mod.rds
 !out/sex_age_avg_mod.rds
+!out/sex_age2_avg_mod.rds
+!out/sex_age3_avg_mod.rds
 !out/sex_migratory_status_mod.rds
 !out/kfc_age_class.rds
 !out/kfc_age_avg.rds
