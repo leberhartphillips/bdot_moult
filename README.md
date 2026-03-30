@@ -20,7 +20,7 @@
 contact: Luke
 (<a href= "mailto:luke.eberhart@bi.mpg.de">luke.eberhart[at]bi.mpg.de</a>)
 
-This repository contains the data objects, fitted model objects, and Quarto source code needed to reproduce the analyses and reported results for our investigation of individual variation in post-breeding molt of banded dotterels (*Anarhynchus bicinctus*) breeding in Kaikōura, New Zealand. Our OSF repository ([https://osf.io/2rkcw/](https://osf.io/2rkcw/); DOI: [10.17605/OSF.IO/2RKCW](https://doi.org/10.17605/OSF.IO/2RKCW)) mirrors this GitHub repository.
+This repository contains the data objects, fitted model objects, and Quarto source code needed to reproduce the analyses and reported results for our investigation of individual variation in post-breeding molt of banded dotterels (*Anarhynchus bicinctus*) breeding in Kaikōura, New Zealand.
 
 For a complete overview of the methods and results presented in the manuscript, see the rendered project vignette: [banded_dotterel_moult.html](https://leberhartphillips.github.io/bdot_moult/banded_dotterel_moult.html)
 
