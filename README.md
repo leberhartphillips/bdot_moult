@@ -96,10 +96,10 @@ Model output produced by brms models presented in [`banded_dotterel_moult.qmd`](
 - [`out/mod_age2_last_brms.rds`](https://github.com/leberhartphillips/bdot_moult/blob/main/out/mod_age2_last_brms.rds)
   Auxillary analysis: Age and migratory status
 - [`out/sex_age2_avg_mod.rds`](https://github.com/leberhartphillips/bdot_moult/blob/main/out/sex_age2_avg_mod.rds)
-  Auxillary analysis: Age and migratory status
+  Auxillary analysis: Continuous Age and molt
 - [`out/sex_all_3_breed_mod2.rds`](https://github.com/leberhartphillips/bdot_moult/blob/main/out/sex_all_3_breed_mod2.rds)
-  Auxillary analysis: Age and migratory status
+  Auxillary analysis: Breeding phenology and molt
 - [`out/sex_all_3_breed_mod3.rds`](https://github.com/leberhartphillips/bdot_moult/blob/main/out/sex_all_3_breed_mod3.rds)
-  Auxillary analysis: Age and migratory status
+  Auxillary analysis: Breeding phenology and molt
 
 These files are the objects currently sourced by the Quarto document and are the minimum set that should remain tracked if the repository is reduced to a reproducibility-focused subset.
