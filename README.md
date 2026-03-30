@@ -4,17 +4,15 @@
 
 ### *in preparation*
 
-#### Luke Eberhart-Hertel<sup>1</sup>, Bashar Jarayseh<sup>1</sup>, Ailsa McGilvary-Howard<sup>3</sup>, Ted Howard<sup>3</sup>, Tony Habraken<sup>4</sup>, Colin F. J. O’Donnell<sup>2</sup>, Emma M. Williams<sup>2</sup>, and Bart Kempenaers<sup>1</sup>
+#### Luke Eberhart-Hertel<sup>1</sup>, Bashar Jarayseh<sup>1</sup>, Ailsa McGilvary-Howard<sup>2</sup>, Ted Howard<sup>2</sup>, Tony Habraken<sup>3</sup>, Colin F. J. O’Donnell<sup>4</sup>, Emma M. Williams<sup>4</sup>, and Bart Kempenaers<sup>1</sup>
 
 1)  *Max Planck Institute for Biological Intelligence, Department of
     Ornithology, Eberhard-Gwinner-Straße 7/8, 82319 Seewiesen, Germany*
-2)  *Fauna Science Team, Department of Conservation Christchurch Office, 
+2)  *Kaikōura Banded Dotterel Project, Kaikōura, New Zealand*
+3)  *Port Waikato Banded Dotterel Project, Port Waikato, New Zealand*
+4)  *Fauna Science Team, Department of Conservation Christchurch Office, 
     Christchurch Mail Centre, Private Bag 4715, Christchurch, 8140, New Zealand*
-3)  *Kaikōura Banded Dotterel Project, Kaikōura, New Zealand*
-4)  *Port Waikato Banded Dotterel Project, Port Waikato, New Zealand*
-5)  *Max Planck Institute for Biological Intelligence, Behavioural
-    Genetics and Evolutionary Ecology, Eberhard-Gwinner-Straße 5, 82319
-    Seewiesen, Germany*
+
 
 ✉ For correspondence regarding the data and code in this repository and the study system, please
 contact: Luke

@@ -1,5 +1,5 @@
 ---
-title: "Banded Dotterel Post-breeding Moult"
+title: "Persistent Individual Differences and Age Shape Post-Breeding Molt Dynamics in a Partially Migratory Shorebird"
 date: "`r format(Sys.time(), '%H:%M %d %B, %Y')`"
 author: 
  - name: Luke Eberhart-Hertel
