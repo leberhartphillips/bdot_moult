@@ -1,105 +1,68 @@
-# Reproducible datasets and code for:
+# Reproducible companion repository for:
 
-## Persistent Individual Differences and Age Shape Post-Breeding Molt Dynamics in a Partially Migratory Shorebird
+## Age class and late reproductive activity predict delayed post-breeding ornamental molt in a partially migratory shorebird
 
-### *in preparation*
+### Luke Eberhart-Hertel, Bashar Jarayseh, Ailsa McGilvary-Howard, Ted Howard, Tony Habraken, Colin F. J. O'Donnell, Emma M. Williams, and Bart Kempenaers
 
-#### Luke Eberhart-Hertel<sup>1</sup>, Bashar Jarayseh<sup>1</sup>, Ailsa McGilvary-Howard<sup>2</sup>, Ted Howard<sup>2</sup>, Tony Habraken<sup>3</sup>, Colin F. J. O’Donnell<sup>4</sup>, Emma M. Williams<sup>4</sup>, and Bart Kempenaers<sup>1</sup>
+This repository is the manuscript companion for the banded dotterel molt study.
+Its main purpose is to let readers render a single Quarto document that
+reproduces the analyses, figures, and reported statistics presented in the
+manuscript, plus the small set of supporting analyses referenced in the text and
+supplementary materials.
 
-1)  *Max Planck Institute for Biological Intelligence, Department of
-    Ornithology, Eberhard-Gwinner-Straße 7/8, 82319 Seewiesen, Germany*
-2)  *Kaikōura Banded Dotterel Project, Kaikōura, New Zealand*
-3)  *Port Waikato Banded Dotterel Project, Port Waikato, New Zealand*
-4)  *Fauna Science Team, Department of Conservation Christchurch Office, 
-    Christchurch Mail Centre, Private Bag 4715, Christchurch, 8140, New Zealand*
+For correspondence about the repository, contact Luke Eberhart-Hertel:
+`luke.eberhart@bi.mpg.de`
 
+## What the repository reproduces
 
-✉ For correspondence regarding the data and code in this repository and the study system, please
-contact: Luke
-(<a href= "mailto:luke.eberhart@bi.mpg.de">luke.eberhart[at]bi.mpg.de</a>)
+The main document is [`banded_dotterel_moult.qmd`](banded_dotterel_moult.qmd),
+with a rendered companion HTML file at
+[`banded_dotterel_moult.html`](banded_dotterel_moult.html).
 
-This repository contains the data objects, fitted model objects, and Quarto source code needed to reproduce the analyses and reported results for our investigation of individual variation in post-breeding molt of banded dotterels (*Anarhynchus bicinctus*) breeding in Kaikōura, New Zealand.
+The Quarto document reproduces:
 
-For a complete overview of the methods and results presented in the manuscript, see the rendered project vignette: [banded_dotterel_moult.html](https://leberhartphillips.github.io/bdot_moult/banded_dotterel_moult.html)
+- manuscript Figure 1a via the tracked static photo montage in `figs/combined_figure_draft.png`
+- manuscript Figure 1b from the photo-level molt and breeding data
+- manuscript Figure 2 (non-linear model schematic)
+- manuscript Table 1
+- manuscript Figure 3 (state-dependent molt trajectories)
+- manuscript Figure 4 (breeding-phenology effects)
+- supplementary Figure S1 (raw sampling distributions)
+- supplementary Figure S2 (exploratory sibling comparison)
+- supporting checks referenced in the manuscript text, including age-class differences in breeding phenology and Fisher exact tests for sex composition across age class and migratory status
 
-![Overview figure from the project vignette](figs/fig2.png)
+The Quarto file renders from the saved model objects in `out/`, so readers do
+not need to refit the Bayesian models to reproduce the reported results. Model
+fitting chunks are retained in the source as `eval=FALSE` blocks for full
+transparency and optional refitting.
 
-## Reproducing the analysis
+## Repository contents
 
-To reproduce the results shown in the manuscript and Quarto document:
+- [`banded_dotterel_moult.qmd`](banded_dotterel_moult.qmd): source document for the full reproducible workflow
+- [`banded_dotterel_moult.html`](banded_dotterel_moult.html): rendered HTML companion
+- [`data/moult_breeding_KK_data.rds`](data/moult_breeding_KK_data.rds): main photo-level molt and breeding dataset
+- [`data/breeding_KK_data.rds`](data/breeding_KK_data.rds): bird-season breeding phenology dataset
+- [`data/nests_KK_data.rds`](data/nests_KK_data.rds): nest dataset used for the breeding-period overlay in Figure 1b
+- `out/`: saved `brms` model objects used to reproduce the manuscript tables and figures without refitting
+- [`figs/combined_figure_draft.png`](figs/combined_figure_draft.png): static manuscript panel used for Figure 1a
+- [`figs/fig2.png`](figs/fig2.png): overview image displayed in this README
 
-1. Clone this repository and open [`moult.Rproj`](moult.Rproj) in RStudio.
-2. Ensure the files listed below are present locally; these are the data and model objects sourced by [`banded_dotterel_moult.qmd`](banded_dotterel_moult.qmd).
-3. Install the R packages referenced in the Quarto document.
-4. Render [`banded_dotterel_moult.qmd`](banded_dotterel_moult.qmd) to regenerate the HTML vignette and tables/figures.
+![Overview figure from the Quarto companion](figs/fig2.png)
 
-#### Repository Contents
+## Rendering the document
 
-- [`README.md`](https://github.com/leberhartphillips/bdot_moult/blob/main/README.md)
-  Landing page and file inventory for reproducibility.
-- [`.gitignore`](https://github.com/leberhartphillips/bdot_moult/blob/main/.gitignore)
-  Git allowlist for the reproducibility-focused repository subset.
-- [`banded_dotterel_moult.qmd`](https://github.com/leberhartphillips/bdot_moult/blob/main/banded_dotterel_moult.qmd)
-  Quarto source code for the full analysis vignette.
-- [`banded_dotterel_moult.html`](https://github.com/leberhartphillips/bdot_moult/blob/main/banded_dotterel_moult.html)
-  Rendered HTML vignette.
-- [`moult.Rproj`](https://github.com/leberhartphillips/bdot_moult/blob/main/moult.Rproj)
-  RStudio project file.
-- [`LICENSE`](https://github.com/leberhartphillips/bdot_moult/blob/main/LICENSE)
-  Repository license.
-- [`figs/fig2.png`](https://github.com/leberhartphillips/bdot_moult/blob/main/figs/fig2.png)
-  Figure displayed in this README.
+1. Open the repository root in RStudio or render from the command line.
+2. Install the R packages checked at the top of `banded_dotterel_moult.qmd`.
+3. Render `banded_dotterel_moult.qmd`.
 
-[**`data/`**](https://github.com/leberhartphillips/bdot_moult/tree/main/data)
-Datasets needed to reproduce analyses presented in [`banded_dotterel_moult.qmd`](banded_dotterel_moult.qmd)
+The document is configured so that normal rendering uses the saved model objects
+already included in the repository. A working `cmdstanr` plus CmdStan
+installation is only needed if you want to rerun the time-consuming model
+fitting chunks.
 
-- [`data/moult_breeding_KK_data.rds`](https://github.com/leberhartphillips/bdot_moult/blob/main/data/moult_breeding_KK_data.rds)
-  Main dataset used for the molt analyses.
-- [`data/breeding_KK_data.rds`](https://github.com/leberhartphillips/bdot_moult/blob/main/data/breeding_KK_data.rds)
-  Breeding dataset used in the auxiliary breeding-phenology analyses.
-- [`data/nests_KK_data.rds`](https://github.com/leberhartphillips/bdot_moult/blob/main/data/nests_KK_data.rds)
-  Nest dataset used in the auxiliary nest analyses.
+## Notes on scope
 
-[**`out/`**](https://github.com/leberhartphillips/bdot_moult/tree/main/out)
-Model output produced by brms models presented in [`banded_dotterel_moult.qmd`](banded_dotterel_moult.qmd)
-
-- [`out/sex_mod.rds`](https://github.com/leberhartphillips/bdot_moult/blob/main/out/sex_mod.rds)
-  Sex-specific model output
-- [`out/sex_all_3_breed_mod.rds`](https://github.com/leberhartphillips/bdot_moult/blob/main/out/sex_all_3_breed_mod.rds)
-  Breeding phenology model output
-- [`out/sex_age_class_mod.rds`](https://github.com/leberhartphillips/bdot_moult/blob/main/out/sex_age_class_mod.rds)
-  Age class model output
-- [`out/sex_age_avg_mod.rds`](https://github.com/leberhartphillips/bdot_moult/blob/main/out/sex_age_avg_mod.rds)
-  Continuous age model output
-- [`out/sex_migratory_status_mod.rds`](https://github.com/leberhartphillips/bdot_moult/blob/main/out/sex_migratory_status_mod.rds)
-  Migratory status model output
-- [`out/kfc_age_class.rds`](https://github.com/leberhartphillips/bdot_moult/blob/main/out/kfc_age_class.rds)
-  Age class model 10-fold cross-validation
-- [`out/kfc_age_avg.rds`](https://github.com/leberhartphillips/bdot_moult/blob/main/out/kfc_age_avg.rds)
-  Continuous age model 10-fold cross-validation
-- [`out/mod_mig_lay_brms.rds`](https://github.com/leberhartphillips/bdot_moult/blob/main/out/mod_mig_lay_brms.rds)
-  Auxillary analysis: Breeding phenology and migratory status
-- [`out/mod_mig_first_brms.rds`](https://github.com/leberhartphillips/bdot_moult/blob/main/out/mod_mig_first_brms.rds)
-  Auxillary analysis: Breeding phenology and migratory status
-- [`out/mod_mig_last_brms.rds`](https://github.com/leberhartphillips/bdot_moult/blob/main/out/mod_mig_last_brms.rds)
-  Auxillary analysis: Breeding phenology and migratory status
-- [`out/mod_age_lay_brms.rds`](https://github.com/leberhartphillips/bdot_moult/blob/main/out/mod_age_lay_brms.rds)
-  Auxillary analysis: Age and migratory status
-- [`out/mod_age_first_brms.rds`](https://github.com/leberhartphillips/bdot_moult/blob/main/out/mod_age_first_brms.rds)
-  Auxillary analysis: Age and migratory status
-- [`out/mod_age_last_brms.rds`](https://github.com/leberhartphillips/bdot_moult/blob/main/out/mod_age_last_brms.rds)
-  Auxillary analysis: Age and migratory status
-- [`out/mod_age2_lay_brms.rds`](https://github.com/leberhartphillips/bdot_moult/blob/main/out/mod_age2_lay_brms.rds)
-  Auxillary analysis: Age and migratory status
-- [`out/mod_age2_first_brms.rds`](https://github.com/leberhartphillips/bdot_moult/blob/main/out/mod_age2_first_brms.rds)
-  Auxillary analysis: Age and migratory status
-- [`out/mod_age2_last_brms.rds`](https://github.com/leberhartphillips/bdot_moult/blob/main/out/mod_age2_last_brms.rds)
-  Auxillary analysis: Age and migratory status
-- [`out/sex_age2_avg_mod.rds`](https://github.com/leberhartphillips/bdot_moult/blob/main/out/sex_age2_avg_mod.rds)
-  Auxillary analysis: Continuous Age and molt
-- [`out/sex_all_3_breed_mod2.rds`](https://github.com/leberhartphillips/bdot_moult/blob/main/out/sex_all_3_breed_mod2.rds)
-  Auxillary analysis: Breeding phenology and molt
-- [`out/sex_all_3_breed_mod3.rds`](https://github.com/leberhartphillips/bdot_moult/blob/main/out/sex_all_3_breed_mod3.rds)
-  Auxillary analysis: Breeding phenology and molt
-
-These files are the objects currently sourced by the Quarto document and are the minimum set that should remain tracked if the repository is reduced to a reproducibility-focused subset.
+This repository is intentionally trimmed to the files needed for the manuscript
+companion itself. Older exploratory outputs, alternative figure variants, and
+auxiliary model objects not referenced in the manuscript have been excluded from
+the tracked subset.

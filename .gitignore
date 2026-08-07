@@ -4,40 +4,40 @@
 # Re-open directories so specific files below can be unignored
 !*/
 
-# Keep repo metadata and top-level reproducibility files
+# Keep repository metadata and companion-document files
 !.gitignore
 !README.md
 !LICENSE
-!moult.Rproj
 !banded_dotterel_moult.qmd
 !banded_dotterel_moult.html
 
-# Keep figure used in the README
+# Keep the figure assets that are directly referenced by the README/qmd
 !figs/fig2.png
+!figs/combined_figure_draft.png
 
-# Keep input data objects sourced by the Quarto document
+# Keep the input data objects required by the Quarto document
 !data/moult_breeding_KK_data.rds
 !data/breeding_KK_data.rds
 !data/nests_KK_data.rds
 
-# Keep model/result objects sourced by the Quarto document
-!out/sex_mod.rds
-!out/sex_all_3_breed_mod.rds
-!out/sex_all_3_breed_mod2.rds
-!out/sex_all_3_breed_mod3.rds
-!out/sex_age_class_mod.rds
-!out/sex_age_avg_mod.rds
-!out/sex_age2_avg_mod.rds
-!out/sex_age3_avg_mod.rds
-!out/sex_migratory_status_mod.rds
-!out/kfc_age_class.rds
-!out/kfc_age_avg.rds
-!out/mod_mig_lay_brms.rds
-!out/mod_mig_first_brms.rds
-!out/mod_mig_last_brms.rds
-!out/mod_age_lay_brms.rds
-!out/mod_age_first_brms.rds
-!out/mod_age_last_brms.rds
-!out/mod_age2_lay_brms.rds
-!out/mod_age2_first_brms.rds
-!out/mod_age2_last_brms.rds
+# Keep the saved model objects that let the qmd reproduce manuscript results
+# without refitting the time-consuming Bayesian models
+!out/sex_mod_.rds
+!out/sex_age_class_mod_2.rds
+!out/sex_age_avg_mod_.rds
+!out/sex_migratory_status_mod_.rds
+!out/sex_first_breed_only_mod_.rds
+!out/sex_last_nest_first_obs_only_mod_.rds
+!out/sex_last_breed_only_mod_.rds
+!out/mod_age_class_first_brms_.rds
+!out/mod_age_class_lay_brms_.rds
+!out/mod_age_class_last_brms_.rds
+!out/mod_age_first_brms_.rds
+!out/mod_age_lay_brms_.rds
+!out/mod_age_last_brms_.rds
+!out/sex_sibling_all_mod_.rds
+!out/sex_sibling_fy_mod_.rds
+!out/sex_sibling_afy_mod_.rds
+
+# Local IDE files
+.Rproj.user
