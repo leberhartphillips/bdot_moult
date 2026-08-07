@@ -21,7 +21,7 @@ with a rendered companion HTML file at
 
 The Quarto document reproduces:
 
-- manuscript Figure 1a via the tracked static photo montage in `figs/combined_figure_draft.png`
+- manuscript Figure 1a via the tracked static photo montage in `figs/fig1a.png`
 - manuscript Figure 1b from the photo-level molt and breeding data
 - manuscript Figure 2 (non-linear model schematic)
 - manuscript Table 1
@@ -44,10 +44,10 @@ transparency and optional refitting.
 - [`data/breeding_KK_data.rds`](data/breeding_KK_data.rds): bird-season breeding phenology dataset
 - [`data/nests_KK_data.rds`](data/nests_KK_data.rds): nest dataset used for the breeding-period overlay in Figure 1b
 - `out/`: saved `brms` model objects used to reproduce the manuscript tables and figures without refitting
-- [`figs/combined_figure_draft.png`](figs/combined_figure_draft.png): static manuscript panel used for Figure 1a
-- [`figs/fig2.png`](figs/fig2.png): overview image displayed in this README
+- [`figs/fig1a.png`](figs/fig1a.png): static manuscript panel used for Figure 1a
+- [`figs/fig_1.png`](figs/fig_1.png): overview image displayed in this README
 
-![Overview figure from the Quarto companion](figs/fig2.png)
+![Overview figure from the manuscript companion](figs/fig_1.png)
 
 ## Rendering the document
 
@@ -59,10 +59,3 @@ The document is configured so that normal rendering uses the saved model objects
 already included in the repository. A working `cmdstanr` plus CmdStan
 installation is only needed if you want to rerun the time-consuming model
 fitting chunks.
-
-## Notes on scope
-
-This repository is intentionally trimmed to the files needed for the manuscript
-companion itself. Older exploratory outputs, alternative figure variants, and
-auxiliary model objects not referenced in the manuscript have been excluded from
-the tracked subset.

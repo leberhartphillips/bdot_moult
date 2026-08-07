@@ -326,7 +326,7 @@ in `figs/` so the Quarto document can render the same panel without relying on
 files outside the repository.
 
 ```{r, echo=FALSE}
-knitr::include_graphics(here("figs/combined_figure_draft.png"))
+knitr::include_graphics(here("figs/fig1a.png"))
 ```
 
 ```{r, include=FALSE}
@@ -515,7 +515,7 @@ male_2023
 ```
 
 ## Hypotheses and predictions
-We tested the following five hypotheses. The 'Sex' and 'Breeding phenology' models used the full dataset, while the 'Age class', 'Continuous age', and 'Migratory status' models used subsets of the full dataset for individuals of known age or migratory status (see Table 1 for sample sizes).
+We tested the following four hypotheses. The 'Sex' and 'Breeding phenology' models used the full dataset, while the 'Age class' and 'Migratory status' models used subsets of the full dataset for individuals of known age or migratory status (see Table 1 for sample sizes).
 
 ### Sex
 - H1: sexual dichromatism in the rufous band score and sex-specific molt timing
@@ -533,21 +533,16 @@ We tested the following five hypotheses. The 'Sex' and 'Breeding phenology' mode
 - P3a: first-year birds express lower rufous band scores in comparison to after-first-year birds due to more complete pigmentation during feather growth in older birds
 - P3b: first-year birds molt earlier than after-first-year birds because the flight feathers of first-years are older (and more worn) than after-first-years, which triggers an earlier complete post-breeding molt program
 
-### Continuous age
-- H4: beyond the first-year transition continuous age structures the molt schedule and rufous band expression
-- P4a: no age-dependent variation in rufous band expression (either within or between individuals)
-- P4b: no age-dependent variation in post-breeding molt timing (either within or between individuals)
-
 ### Migratory strategy
-- H5: migratory strategy structures the molt schedule and rufous band expression
-- P5a: no strategy-dependent variation in rufous band expression
-- P5b: migrants molt earlier than residents due to their more constrained fall migration schedule
+- H4: migratory strategy structures the molt schedule and rufous band expression
+- P4a: no strategy-dependent variation in rufous band expression
+- P4b: migrants molt earlier than residents due to their more constrained fall migration schedule
 
 ## Non-linear mixed effects model
 
 We scored the rufous breast band on a seven-point scale, so the response is bounded and declines through the season as birds transition from their breeding ("alternate") plumage into their non-breeding plumage ("basic") via the complete post-breeding molt.
 
-We fit the same nonlinear trajectory for all five models and let the predictors explain variation in the starting score and the timing of the decline.
+We fit the same nonlinear trajectory for all four main models and let the predictors explain variation in the starting score and the timing of the decline.
 
 We modeled the decline in rufous band score with a nonlinear mixed-effects curve. Because we centered and scaled Julian date within season before fitting, we write the seasonal date term as $x$. For observation $j$ on bird $i$,
 
@@ -575,7 +570,7 @@ k &= \alpha_k .
 \end{aligned}
 $$
 
-Here, $\mathbf{X}$ denotes the relevant fixed effects for a given model. In the sex-only model, $\mathbf{X}$ contains sex; in the other models, we added breeding phenology, age class, continuous age terms (i.e., within- vs. between-individual), or migratory status. We kept the same nonlinear form throughout so that differences among models reflect changes in predictors of $\beta$ and $t_0$, not changes in the underlying molt curve.
+Here, $\mathbf{X}$ denotes the relevant fixed effects for a given model. In the sex-only model, $\mathbf{X}$ contains sex; in the other models, we added breeding phenology, age class, or migratory status. We kept the same nonlinear form throughout so that differences among models reflect changes in predictors of $\beta$ and $t_0$, not changes in the underlying molt curve.
 
 We used an informative prior on $\beta$ (i.e., <code>normal(5.5, 1)</code>; centering the prior near the upper half of the 1-7 scoring scale and keeping it positive), weakly informative priors on $t_0$ and $k$, and exponential priors on the group-level standard deviations. This combination stabilized estimation while still allowing substantial variation among birds and among bird-by-season combinations when the data supported it.
 
@@ -1052,78 +1047,6 @@ saveRDS(list(fitted_model = fit_mod_sex_age_class,
         file = here("out/sex_age_class_mod_2.rds"))
 ```
 
-### Analysis: Continuous Age model
-Following Van de Pol & Verhulst (2006), we decomposed age ($x_{ist}$) into each bird's mean age across the three-year study period ($\bar{x}_i$; the between-individual effect, implemented as `avg_age`) and the deviation from that mean for a given observation ($x_{ist} - \bar{x}_i$; the within-individual effect, implemented as `age_dev`). Because the age-class model already tests the first-year versus after-first-year contrast directly, we fit the continuous-age model only to after-first-year (AFY) observations (`age > 1`) to ask whether any age effect persists beyond that initial transition.
-
-#### datasets
-Here we use an AFY-only continuous age dataset (`dat_age_mod`), excluding age-1 observations so that the within- and between-individual age terms quantify age-related variation among older birds only.
-```{r}
-# calculate average age in the AFY-only dataset of individuals of known age
-avg_ages <-
-  dat_breeding %>%
-  distinct(rings_comb, age) %>%
-  filter(!is.na(age)) %>%
-  filter(age > 1) %>%
-  group_by(rings_comb) %>%
-  summarise(avg_age = mean(age, na.rm = TRUE))
-
-# wrangle data
-dat_age_mod <- dat_breeding %>%
-  # subset to columns of interest
-  select(score, date_J, rings_comb, sex, season, age) %>%
-  # reduce to distinct data
-  distinct() %>%
-  add_reference_date_scaling() %>%
-  # center age
-  filter(!is.na(age)) %>%
-  filter(age > 1) %>%
-  left_join(., avg_ages, by = "rings_comb") %>%
-  # age deviance
-  ungroup() %>%
-  mutate(age_dev = age - avg_age) %>%
-  # drop NAs
-  drop_na(score, date_J, sex, rings_comb,
-          season, avg_age, age_dev) %>%
-  # convert to dataframe
-  as.data.frame()
-```
-
-#### model formula specification
-```{r}
-mod_sex_age_avg <- bf(
-  score ~ 1 + (baseline - 1) * (1 - 1 / (1 + exp(-k * (date_J_scaled - t0)))),
-  baseline ~ sex + age_dev + avg_age + (1 | i | rings_comb) + (1 | rings_comb:season),
-  t0 ~ sex + season + age_dev + avg_age + (1 | i | rings_comb) + (1 | rings_comb:season),
-  k ~ 1,
-  nl = TRUE
-)
-```
-
-#### fit model
-We fit the main continuous-age model to the AFY-only known-age dataset here.
-```{r, eval=FALSE}
-fit_mod_sex_age_avg <- brm(
-  formula = mod_sex_age_avg,
-  data = dat_age_mod,
-  family = gaussian(),
-  prior = moult_priors,
-  control = list(adapt_delta = 0.999, max_treedepth = 15),
-  chains = 4,
-  cores = 4,
-  iter = 10000,
-  warmup = 5000,
-  backend = "cmdstanr",
-  save_pars = save_pars(all = TRUE),
-  seed = 123
-)
-```
-
-```{r, echo=FALSE, eval=FALSE}
-saveRDS(list(fitted_model = fit_mod_sex_age_avg,
-             data = dat_age_mod),
-        file = here("out/sex_age_avg_mod_.rds"))
-```
-
 ### Analysis: Migratory Strategy model
 We finally tested whether migratory strategy explained variation in
 $\beta$ and $t_0$ after accounting for sex. If migration imposes tighter
@@ -1181,7 +1104,7 @@ saveRDS(list(fitted_model = fit_mod_sex_migratory_status,
 ```
 
 ## Results
-Using 1,646 scored photographs from 100 birds across three seasons, we found that 1) baseline rufous band score showed clear persistent differences among birds, whereas evidence for cross-year repeatability in molt timing was weak, 2) age explained variation primarily through the first-year versus after-first-year contrast, with little evidence for additional continuous age trends among AFY birds, and 3) the single-predictor breeding-phenology models showed clear positive associations between later last nest initiation, later last breeding date, and molt midpoint, while first breeding date showed little evidence of an association. Migratory strategy did not clearly shift the molt schedule. The results below start from the saved model objects in `out/`, so this section can be rerun without refitting the time-consuming Bayesian models above. Helper chunks are hidden in the HTML to keep the shared document readable, while the visible chunks show only the short code needed to reproduce the reported tables.
+Using 1,646 scored photographs from 100 birds across three seasons, we found that 1) baseline rufous band score showed clear persistent differences among birds, whereas evidence for cross-year repeatability in molt timing was weak, 2) age-class differences were evident in molt timing but not in baseline score, and 3) the single-predictor breeding-phenology models showed clear positive associations between later last nest initiation, later last breeding date, and molt midpoint, while first breeding date showed little evidence of an association. Migratory strategy did not clearly shift the molt schedule. The results below start from the saved model objects in `out/`, so this section can be rerun without refitting the time-consuming Bayesian models above. Helper chunks are hidden in the HTML to keep the shared document readable, while the visible chunks show only the short code needed to reproduce the reported tables.
 
 ```{r results-helpers, include=FALSE}
 # Summarise posterior draws as a median and 95% credible interval.
@@ -1798,7 +1721,6 @@ display_consolidated_table <- function(tbl) {
     "Sex-specific" = count_model_individuals("sex_mod", 100L),
     "Breeding phenology" = count_model_individuals("sex_last_breed_only_mod", 81L),
     "Age-class" = count_model_individuals("sex_age_class_mod", 86L),
-    "Continuous age (AFY only)" = count_model_individuals("sex_age_avg_mod", 22L),
     "Migratory status" = count_model_individuals("sex_migratory_status_mod", 41L)
   )
 
@@ -1843,10 +1765,6 @@ display_consolidated_table <- function(tbl) {
           "Sex effect (males – females; Δ score)",
         grepl("^Age-class effect on baseline alternate plumage score", parameter) ~
           "Age-class effect (AFY – FY; Δ score)",
-        grepl("^Between-individual age effect on baseline alternate plumage score", parameter) ~
-          "Between-individual age effect (Δ score)",
-        grepl("^Within-individual age effect on baseline alternate plumage score", parameter) ~
-          "Within-individual age effect (Δ score)",
         grepl("^Migratory-strategy effect on baseline alternate plumage score", parameter) ~
           "Migratory-strategy effect (Resident – Migrant; Δ score)",
         grepl("^Pre-basic moult midpoint \\(t0\\), season", parameter) ~
@@ -1867,10 +1785,6 @@ display_consolidated_table <- function(tbl) {
           "Sex effect (males – females; Δ days)",
         grepl("^Age-class effect on pre-basic moult", parameter) ~
           "Age-class effect (AFY – FY; Δ days)",
-        grepl("^Between-individual age effect on pre-basic moult midpoint", parameter) ~
-          "Between-individual age effect (Δ days)",
-        grepl("^Within-individual age effect on pre-basic moult midpoint", parameter) ~
-          "Within-individual age effect (Δ days)",
         grepl("^Migratory-strategy effect on pre-basic moult midpoint", parameter) ~
           "Migratory-strategy effect (Resident – Migrant; Δ days)",
         grepl("first breeding date", parameter, ignore.case = TRUE) ~
@@ -1901,8 +1815,6 @@ display_consolidated_table <- function(tbl) {
       ),
       model = case_when(
         grepl("^Age-class effect", parameter) ~ "Age-class",
-        grepl("^Between-individual age effect|^Within-individual age effect", parameter) ~
-          "Continuous age (AFY only)",
         grepl("^Migratory-strategy effect", parameter) ~ "Migratory status",
         grepl(
           "first breeding date|last nest initiation date|last breeding date",
@@ -1975,7 +1887,6 @@ display_consolidated_table <- function(tbl) {
 # Load each saved model once so the visible chunks can stay short and readable.
 sex_mod <- readRDS(here("out/sex_mod_.rds"))
 sex_age_class_mod <- readRDS(here("out/sex_age_class_mod_2.rds"))
-sex_age_avg_mod <- readRDS(here("out/sex_age_avg_mod_.rds"))
 sex_migratory_status_mod <- readRDS(here("out/sex_migratory_status_mod_.rds"))
 
 single_breeding_model_paths <- c(
@@ -2001,7 +1912,6 @@ if (!is.null(single_breeding_models)) {
 results_models <- list(
   "Sex + season moult model" = sex_mod,
   "Sex + season + age-class model" = sex_age_class_mod,
-  "Sex + season + continuous-age model (AFY only)" = sex_age_avg_mod,
   "Sex + season + migratory-status model" = sex_migratory_status_mod
 )
 
@@ -2209,46 +2119,6 @@ sex_age_class_mod_summary_table <- bind_rows(
 display_result_table(sex_age_class_mod_summary_table)
 ```
 
-### Results: Continuous Age model (AFY only)
-Restricting the continuous-age analysis to AFY birds asked whether age continued to explain molt variation after the first-year transition. There was little clear evidence for either between- or within-individual age effects on baseline plumage score or molt midpoint among AFY birds.
-
-```{r results-age-model, echo=FALSE}
-age_post <- as_draws_df(sex_age_avg_mod$fitted_model)
-
-# Convert the t0 age effects from scaled units back to days per year.
-date_scale <- weighted_date_scaling(sex_age_avg_mod$data)
-mean_date_sd <- date_scale$weighted_sd
-
-sex_age_avg_mod_summary_table <- bind_rows(
-  summary_row(
-    "Between-individual age effect on baseline alternate plumage score (β)",
-    "Posterior estimates (state-specific means)",
-    "Full alternate plumage score (beta)",
-    age_post$b_baseline_avg_age
-  ),
-  summary_row(
-    "Within-individual age effect on baseline alternate plumage score (β)",
-    "Posterior estimates (state-specific means)",
-    "Full alternate plumage score (beta)",
-    age_post$b_baseline_age_dev
-  ),
-  summary_row(
-    "Between-individual age effect on pre-basic moult midpoint (t0)",
-    "Posterior estimates (state-specific means)",
-    "Pre-basic moult mid-point date (t0)",
-    age_post$b_t0_avg_age * mean_date_sd
-  ),
-  summary_row(
-    "Within-individual age effect on pre-basic moult midpoint (t0)",
-    "Posterior estimates (state-specific means)",
-    "Pre-basic moult mid-point date (t0)",
-    age_post$b_t0_age_dev * mean_date_sd
-  )
-)
-
-display_result_table(sex_age_avg_mod_summary_table)
-```
-
 ### Results: Migratory Strategy model
 Residents and migrants showed similar baseline plumage scores and molt timing, with broad overlap in both traits.
 
@@ -2309,7 +2179,6 @@ sex_remaining_parameters <- c(
 grand_summary_table <- bind_rows(
   pick_parameter_rows(sex_mod_summary_table, sex_baseline_parameters),
   sex_age_class_mod_summary_table %>% slice(1),
-  sex_age_avg_mod_summary_table %>% slice(1:2),
   sex_migratory_status_mod_summary_table %>% slice(1),
   pick_parameter_rows(sex_mod_summary_table, sex_t0_parameters),
   sex_age_class_mod_summary_table %>% slice(2),
@@ -3581,15 +3450,6 @@ ggsave(
 ```{r}
 #| code-fold: true
 #| code-summary: "Show code for data wrangle steps for analysis of age and breeding phenology"
-# average ages excluding first year
-avg_ages <-
-  dat_breeding %>%
-  distinct(rings_comb, age) %>%
-  filter(!is.na(age)) %>%
-  filter(age > 1) %>%
-  group_by(rings_comb) %>%
-  summarise(avg_age = mean(age, na.rm = TRUE))
-
 # wrangle age-class breeding-phenology data
 dat_age_class_breed <- dat_breeding %>%
   select(
@@ -3606,34 +3466,6 @@ dat_age_class_breed <- dat_breeding %>%
     last_nest_first_obs_J_snum
   ) %>%
   as.data.frame()
-
-# wrangle AFY-only continuous-age breeding-phenology data
-dat_age_breed <- dat_breeding %>%
-  select(
-    rings_comb, sex, age,
-    last_breeding_date_J_snum,
-    first_breeding_date_J_snum,
-    last_nest_first_obs_J_snum
-  ) %>%
-  distinct() %>%
-  filter(!is.na(age)) %>%
-  filter(age > 1) %>%
-  left_join(., avg_ages, by = "rings_comb") %>%
-  mutate(age_dev = age - avg_age) %>%
-  drop_na(
-    rings_comb, sex, avg_age, age_dev,
-    last_breeding_date_J_snum,
-    first_breeding_date_J_snum,
-    last_nest_first_obs_J_snum
-  ) %>%
-  as.data.frame() %>%
-  select(
-    rings_comb, sex, avg_age, age_dev,
-    last_breeding_date_J_snum,
-    first_breeding_date_J_snum,
-    last_nest_first_obs_J_snum
-  ) %>%
-  distinct()
 ```
 
 ```{r, eval=FALSE}
@@ -3672,34 +3504,6 @@ mod_age_class_lay_brms <- brm(
   chains = 4, cores = 4, iter = 4000, warmup = 1000,
   seed   = 123
 )
-
-# Continuous age among AFY birds only, matching the main AFY-only moult model logic
-mod_age_first_brms <- brm(
-  first_breeding_date_J_snum ~ sex + age_dev + avg_age + (1 | rings_comb),
-  data   = dat_age_breed,
-  family = gaussian(),
-  prior  = priors_gauss,
-  chains = 4, cores = 4, iter = 4000, warmup = 1000,
-  seed   = 123
-)
-
-mod_age_last_brms <- brm(
-  last_breeding_date_J_snum ~ sex + age_dev + avg_age + (1 | rings_comb),
-  data   = dat_age_breed,
-  family = gaussian(),
-  prior  = priors_gauss,
-  chains = 4, cores = 4, iter = 4000, warmup = 1000,
-  seed   = 123
-)
-
-mod_age_lay_brms <- brm(
-  last_nest_first_obs_J_snum ~ sex + age_dev + avg_age + (1 | rings_comb),
-  data   = dat_age_breed,
-  family = gaussian(),
-  prior  = priors_gauss,
-  chains = 4, cores = 4, iter = 4000, warmup = 1000,
-  seed   = 123
-)
 ```
 
 ```{r, eval=FALSE, echo=FALSE}
@@ -3709,13 +3513,6 @@ saveRDS(list(fitted_model = mod_age_class_last_brms, data = dat_age_class_breed)
         file = here("out/mod_age_class_last_brms_.rds"))
 saveRDS(list(fitted_model = mod_age_class_lay_brms, data = dat_age_class_breed),
         file = here("out/mod_age_class_lay_brms_.rds"))
-
-saveRDS(list(fitted_model = mod_age_first_brms, data = dat_age_breed),
-        file = here("out/mod_age_first_brms_.rds"))
-saveRDS(list(fitted_model = mod_age_last_brms, data = dat_age_breed),
-        file = here("out/mod_age_last_brms_.rds"))
-saveRDS(list(fitted_model = mod_age_lay_brms, data = dat_age_breed),
-        file = here("out/mod_age_lay_brms_.rds"))
 ```
 
 ```{r, include=FALSE}
@@ -3723,25 +3520,15 @@ mod_age_class_first_brms <- readRDS(here("out/mod_age_class_first_brms_.rds"))
 mod_age_class_last_brms <- readRDS(here("out/mod_age_class_last_brms_.rds"))
 mod_age_class_lay_brms <- readRDS(here("out/mod_age_class_lay_brms_.rds"))
 
-mod_age_first_brms <- readRDS(here("out/mod_age_first_brms_.rds"))
-mod_age_last_brms <- readRDS(here("out/mod_age_last_brms_.rds"))
-mod_age_lay_brms <- readRDS(here("out/mod_age_lay_brms_.rds"))
-
 # Summaries (posterior medians/means + CrIs)
 summary(mod_age_class_first_brms$fitted_model)
 summary(mod_age_class_last_brms$fitted_model)
 summary(mod_age_class_lay_brms$fitted_model)
-summary(mod_age_first_brms$fitted_model)
-summary(mod_age_last_brms$fitted_model)
-summary(mod_age_lay_brms$fitted_model)
 
 # Random-effect SDs and correlations
 VarCorr(mod_age_class_first_brms$fitted_model)
 VarCorr(mod_age_class_last_brms$fitted_model)
 VarCorr(mod_age_class_lay_brms$fitted_model)
-VarCorr(mod_age_first_brms$fitted_model)
-VarCorr(mod_age_last_brms$fitted_model)
-VarCorr(mod_age_lay_brms$fitted_model)
 ```
 
 ```{r, include=FALSE}
@@ -3772,72 +3559,16 @@ summarise_breeding_age_class <- function(first_model, nest_model, last_model) {
   )
 }
 
-summarise_breeding_age_continuous <- function(first_model, nest_model, last_model) {
-  first_post <- as_draws_df(first_model$fitted_model)
-  nest_post <- as_draws_df(nest_model$fitted_model)
-  last_post <- as_draws_df(last_model$fitted_model)
-
-  bind_rows(
-    summary_row(
-      "Δ first breeding date per +1 year between-individual age (avg_age; days)",
-      "Posterior estimates (fixed effects)",
-      "Age and breeding phenology",
-      first_post$b_avg_age
-    ),
-    summary_row(
-      "Δ first breeding date per +1 year within-individual age (age_dev; days)",
-      "Posterior estimates (fixed effects)",
-      "Age and breeding phenology",
-      first_post$b_age_dev
-    ),
-    summary_row(
-      "Δ last nest initiation date per +1 year between-individual age (avg_age; days)",
-      "Posterior estimates (fixed effects)",
-      "Age and breeding phenology",
-      nest_post$b_avg_age
-    ),
-    summary_row(
-      "Δ last nest initiation date per +1 year within-individual age (age_dev; days)",
-      "Posterior estimates (fixed effects)",
-      "Age and breeding phenology",
-      nest_post$b_age_dev
-    ),
-    summary_row(
-      "Δ last breeding date per +1 year between-individual age (avg_age; days)",
-      "Posterior estimates (fixed effects)",
-      "Age and breeding phenology",
-      last_post$b_avg_age
-    ),
-    summary_row(
-      "Δ last breeding date per +1 year within-individual age (age_dev; days)",
-      "Posterior estimates (fixed effects)",
-      "Age and breeding phenology",
-      last_post$b_age_dev
-    )
-  )
-}
-
 age_class_breed_summary_table <- summarise_breeding_age_class(
   mod_age_class_first_brms,
   mod_age_class_lay_brms,
   mod_age_class_last_brms
-)
-
-age_continuous_breed_summary_table <- summarise_breeding_age_continuous(
-  mod_age_first_brms,
-  mod_age_lay_brms,
-  mod_age_last_brms
 )
 ```
 
 #### Summary table: age class (FY vs AFY)
 ```{r, echo=FALSE}
 display_result_table(age_class_breed_summary_table)
-```
-
-#### Summary table: continuous age among AFY birds
-```{r, echo=FALSE}
-display_result_table(age_continuous_breed_summary_table)
 ```
 
 #### Fixed effects with 95% CrI
@@ -3850,18 +3581,6 @@ fixef(mod_age_class_lay_brms$fitted_model, probs = c(0.025, 0.5, 0.975)) %>%
   round(2)
 
 fixef(mod_age_class_last_brms$fitted_model, probs = c(0.025, 0.5, 0.975)) %>%
-  round(2)
-```
-
-Continuous age among AFY birds
-```{r}
-fixef(mod_age_first_brms$fitted_model, probs = c(0.025, 0.5, 0.975)) %>%
-  round(2)
-
-fixef(mod_age_lay_brms$fitted_model, probs = c(0.025, 0.5, 0.975)) %>%
-  round(2)
-
-fixef(mod_age_last_brms$fitted_model, probs = c(0.025, 0.5, 0.975)) %>%
   round(2)
 ```
 
@@ -4718,7 +4437,8 @@ if (exists("sibling_matching_plot_df")) {
       legend.title = element_blank()
     )
 
-  sibling_matching_plot
+  # Explicitly print the patchwork object so knitr embeds it in the HTML output.
+  print(sibling_matching_plot)
 
   ggsave(
     plot = sibling_matching_plot,
@@ -4842,9 +4562,13 @@ knitr::kable(
 
 ### Required repository files
 
-These are the tracked input files used directly by the current manuscript
-companion. The final export file `out/grand_summary_table_final_.xlsx` is
-optional and is only written if the export chunk is run manually.
+These are the tracked files currently retained for the curated manuscript
+companion repository. They include the datasets and saved model objects used by
+the Quarto workflow, plus the figure assets kept for the rendered companion and
+README. Earlier AFY continuous-age model objects are intentionally omitted
+because that analysis is no longer part of the revised manuscript. The final
+export file `out/grand_summary_table_final_.xlsx` is optional and is only
+written if the export chunk is run manually.
 
 ```{r reproducibility-input-files, echo=FALSE}
 reproducibility_inputs <-
@@ -4853,10 +4577,10 @@ reproducibility_inputs <-
     "data/moult_breeding_KK_data.rds", "Main photo-level molt and breeding dataset",
     "data/breeding_KK_data.rds", "Bird-season breeding phenology dataset",
     "data/nests_KK_data.rds", "Nest dataset used for the breeding-period overlay",
-    "figs/combined_figure_draft.png", "Static manuscript panel used for Figure 1a",
+    "figs/fig1a.png", "Static manuscript panel used for Figure 1a",
+    "figs/fig_1.png", "Overview image displayed in the repository README",
     "out/sex_mod_.rds", "Main sex-specific molt model",
     "out/sex_age_class_mod_2.rds", "Main age-class molt model",
-    "out/sex_age_avg_mod_.rds", "Main AFY continuous-age molt model",
     "out/sex_migratory_status_mod_.rds", "Main migratory-strategy molt model",
     "out/sex_first_breed_only_mod_.rds", "Single-predictor model for first breeding date",
     "out/sex_last_nest_first_obs_only_mod_.rds", "Single-predictor model for last nest initiation date",
@@ -4864,9 +4588,6 @@ reproducibility_inputs <-
     "out/mod_age_class_first_brms_.rds", "Supporting age-class model for first breeding date",
     "out/mod_age_class_lay_brms_.rds", "Supporting age-class model for last nest initiation date",
     "out/mod_age_class_last_brms_.rds", "Supporting age-class model for last breeding date",
-    "out/mod_age_first_brms_.rds", "Supporting AFY continuous-age model for first breeding date",
-    "out/mod_age_lay_brms_.rds", "Supporting AFY continuous-age model for last nest initiation date",
-    "out/mod_age_last_brms_.rds", "Supporting AFY continuous-age model for last breeding date",
     "out/sex_sibling_all_mod_.rds", "Supplementary sibling model using all trusted sibling birds",
     "out/sex_sibling_fy_mod_.rds", "Supplementary sibling model restricted to FY birds",
     "out/sex_sibling_afy_mod_.rds", "Supplementary sibling model restricted to AFY birds"
@@ -4886,10 +4607,11 @@ knitr::kable(
 
 All `brms` models in this document are fitted with four chains. The main molt
 models use 10,000 iterations per chain with 5,000 warmup iterations and
-`backend = "cmdstanr"`. The supporting Gaussian breeding-phenology and sibling
-models use 4,000 iterations per chain with 1,000 warmup iterations. The seeds
-used in the current source are listed below so a reader can refit with the same
-random-number initialization.
+`backend = "cmdstanr"`. The supporting Gaussian age-class breeding-phenology
+models use 4,000 iterations per chain with 1,000 warmup iterations, whereas
+the supplementary sibling models currently use 10,000 iterations per chain with
+5,000 warmup iterations. The seeds used in the current source are listed below
+so a reader can refit with the same random-number initialization.
 
 ```{r reproducibility-refit-settings, echo=FALSE}
 refit_settings <-
@@ -4900,13 +4622,11 @@ refit_settings <-
     "Last breeding date molt model", "out/sex_last_breed_only_mod_.rds", 142, 10000, 5000, "Single-predictor breeding-phenology model",
     "Last nest initiation molt model", "out/sex_last_nest_first_obs_only_mod_.rds", 143, 10000, 5000, "Single-predictor breeding-phenology model",
     "Age-class molt model", "out/sex_age_class_mod_2.rds", 123, 10000, 5000, "Main manuscript model",
-    "Continuous-age molt model", "out/sex_age_avg_mod_.rds", 123, 10000, 5000, "Main manuscript model",
     "Migratory-strategy molt model", "out/sex_migratory_status_mod_.rds", 123, 10000, 5000, "Main manuscript model",
     "Age-class breeding phenology models", "out/mod_age_class_{first,lay,last}_brms_.rds", 123, 4000, 1000, "Supporting manuscript check",
-    "Continuous-age breeding phenology models", "out/mod_age_{first,lay,last}_brms_.rds", 123, 4000, 1000, "Supporting manuscript check",
-    "Sibling model: all trusted sibling birds", "out/sex_sibling_all_mod_.rds", 601, 4000, 1000, "Supplementary Figure S2",
-    "Sibling model: FY birds", "out/sex_sibling_fy_mod_.rds", 602, 4000, 1000, "Supplementary Figure S2",
-    "Sibling model: AFY birds", "out/sex_sibling_afy_mod_.rds", 603, 4000, 1000, "Supplementary Figure S2"
+    "Sibling model: all trusted sibling birds", "out/sex_sibling_all_mod_.rds", 601, 10000, 5000, "Supplementary Figure S2",
+    "Sibling model: FY birds", "out/sex_sibling_fy_mod_.rds", 602, 10000, 5000, "Supplementary Figure S2",
+    "Sibling model: AFY birds", "out/sex_sibling_afy_mod_.rds", 603, 10000, 5000, "Supplementary Figure S2"
   )
 
 knitr::kable(
