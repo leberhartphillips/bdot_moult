@@ -1,39 +1,41 @@
-# Ignore everything by default
+# Keep only the inputs, code and assets needed for the reported analyses.
 *
-
-# Re-open directories so specific files below can be unignored
 !*/
 
-# Keep repository metadata and companion-document files
-!.gitignore
-!README.md
-!LICENSE
-!banded_dotterel_moult.qmd
-!banded_dotterel_moult.html
+# Explicit publication bundle
+!/.gitignore
+!/README.md
+!/LICENSE
+!/banded_dotterel_moult.qmd
+!/banded_dotterel_moult.html
+!/R/scoring_validation_correlations.R
+!/data/moult_breeding_KK_data.rds
+!/data/breeding_KK_data.rds
+!/data/nests_KK_data.rds
+!/data/Scoring - test.xlsx
+!/data/Kaikoura_Dotterel_2021_Feb2022_upd_Nov22_Locations.xlsx
+!/data/Kaikoura_Dotterel_Jan23_upd.xlsx
+!/data/Kaikoura_Dotterel_Feb2024_upd.xlsx
+!/out/sex_mod_.rds
+!/out/sex_age_class_mod_2.rds
+!/out/sex_migratory_status_mod_.rds
+!/out/sex_first_breed_within_individual_afy_mod_.rds
+!/out/sex_last_nest_within_individual_afy_mod_.rds
+!/out/sex_last_breed_within_individual_afy_mod_.rds
+!/out/afy_sex_last_breeding_interaction_2026-11-18/model.rds
+!/out/sex_migratory_interaction_mod_.rds
+!/scripts/run_afy_within_individual_breeding_phenology_models.R
+!/scripts/run_afy_sex_last_breeding_interaction_2026-11-18.R
+!/scripts/export_figure_s1_panels_2026-11-20.R
+!/figs/fig1a.png
+!/figs/Figure_S1_for_Word_2026-11-20/Figure_S1_2021-2022_females.png
+!/figs/Figure_S1_for_Word_2026-11-20/Figure_S1_2021-2022_males.png
+!/figs/Figure_S1_for_Word_2026-11-20/Figure_S1_2022-2023_females.png
+!/figs/Figure_S1_for_Word_2026-11-20/Figure_S1_2022-2023_males.png
+!/figs/Figure_S1_for_Word_2026-11-20/Figure_S1_2023-2024_females.png
+!/figs/Figure_S1_for_Word_2026-11-20/Figure_S1_2023-2024_males.png
+!/assets/fonts/Lato-Regular.ttf
+!/assets/fonts/OFL.txt
 
-# Keep the figure assets that are directly referenced by the README/qmd
-!figs/fig1a.png
-!figs/fig_1.png
-
-# Keep the input data objects required by the Quarto document
-!data/moult_breeding_KK_data.rds
-!data/breeding_KK_data.rds
-!data/nests_KK_data.rds
-
-# Keep the saved model objects that let the qmd reproduce manuscript results
-# without refitting the time-consuming Bayesian models
-!out/sex_mod_.rds
-!out/sex_age_class_mod_2.rds
-!out/sex_migratory_status_mod_.rds
-!out/sex_first_breed_only_mod_.rds
-!out/sex_last_nest_first_obs_only_mod_.rds
-!out/sex_last_breed_only_mod_.rds
-!out/mod_age_class_first_brms_.rds
-!out/mod_age_class_lay_brms_.rds
-!out/mod_age_class_last_brms_.rds
-!out/sex_sibling_all_mod_.rds
-!out/sex_sibling_fy_mod_.rds
-!out/sex_sibling_afy_mod_.rds
-
-# Local IDE files
-.Rproj.user
+# Local IDE state
+.Rproj.user/

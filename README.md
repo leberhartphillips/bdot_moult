@@ -1,61 +1,140 @@
-# Reproducible companion repository for:
+# Banded dotterel molt study
 
-## Age class and late reproductive activity predict delayed post-breeding ornamental molt in a partially migratory shorebird
+## Repeatable ornament expression and limited evidence for breeding-related plasticity in molt timing
 
-### Luke Eberhart-Hertel, Bashar Jarayseh, Ailsa McGilvary-Howard, Ted Howard, Tony Habraken, Colin F. J. O'Donnell, Emma M. Williams, and Bart Kempenaers
+Luke Eberhart-Hertel, Bashar Jarayseh, Ailsa McGilvary-Howard, Ted Howard,
+Tony Habraken, Emma M. Williams, Colin F. J. O'Donnell, and Bart Kempenaers
 
-This repository is the manuscript companion for the banded dotterel molt study.
-Its main purpose is to let readers render a single Quarto document that
-reproduces the analyses, figures, and reported statistics presented in the
-manuscript, plus the small set of supporting analyses referenced in the text and
-supplementary materials.
+This repository contains the commented script, data and saved models accompanying
+the revised manuscript. Repeated photographs of marked banded dotterels allow us
+to estimate baseline ornament expression and post-breeding molt midpoint together.
+We compare individual consistency in these components and assess breeding-related
+plasticity by separating among- and within-individual associations in confidently
+after-first-year (AFY) birds. In this study, adult includes both first-year and AFY
+birds.
 
-For correspondence about the repository, contact Luke Eberhart-Hertel:
-`luke.eberhart@bi.mpg.de`
+For correspondence, contact Luke Eberhart-Hertel: `luke.eberhart@bi.mpg.de`.
 
-## What the repository reproduces
+## Start here
 
-The main document is [`banded_dotterel_moult.qmd`](banded_dotterel_moult.qmd),
-with a rendered companion HTML file at
-[`banded_dotterel_moult.html`](banded_dotterel_moult.html).
+- [Commented analysis script](banded_dotterel_moult.qmd): Quarto source with the
+  equations, their R implementations, sample definitions, results and diagnostics.
+- [Rendered analysis](banded_dotterel_moult.html): download this self-contained HTML
+  file and open it in a browser. GitHub's file viewer does not display the full
+  rendered document.
 
-The Quarto document reproduces:
+The HTML includes code folding and a Code menu for viewing the source. Rendering
+uses the eight saved models in `out/`; **it does not refit any model**. The
+model-fitting calls are shown in blocks marked `eval=FALSE` for optional refitting.
 
-- manuscript Figure 1a via the tracked static photo montage in `figs/fig1a.png`
-- manuscript Figure 1b from the photo-level molt and breeding data
-- manuscript Figure 2 (non-linear model schematic)
-- manuscript Table 1
-- manuscript Figure 3 (state-dependent molt trajectories)
-- manuscript Figure 4 (breeding-phenology effects)
-- supplementary Figure S1 (raw sampling distributions)
-- supplementary Figure S2 (exploratory sibling comparison)
-- supporting checks referenced in the manuscript text, including age-class differences in breeding phenology and Fisher exact tests for sex composition across age class and migratory status
+## Manuscript outputs
 
-The Quarto file renders from the saved model objects in `out/`, so readers do
-not need to refit the Bayesian models to reproduce the reported results. Model
-fitting chunks are retained in the source as `eval=FALSE` blocks for full
-transparency and optional refitting.
+| Output | Contents |
+| --- | --- |
+| Table 1 | Sex, age-class, migratory-status, season and repeatability results |
+| Table 2 and Figure 4 | Among- and within-individual breeding–molt associations for three breeding-date measures |
+| Table S1 | Sex interactions with the AFY mean and deviation in last observed breeding date, and with migratory status |
+| Figures 1–3 | Scoring examples, nonlinear trajectory schematic and state-specific trajectories |
+| Figure S1 | Six panels of raw observations by sex and season, ordered and colour-coded by migratory status |
+| Figure S2 | Approximate power to detect a resident–migrant midpoint difference |
+| Supporting summaries | Observer agreement, breeding-date ranges, recorded attempts, first-year breeding records, Fisher's exact tests and final local plumage scores |
 
-## Repository contents
+The main AFY analysis uses **47 birds across 86 bird-seasons and 1,045 scored
+observations**. Twenty-eight birds contributed repeated AFY seasons. Each breeding
+date is fitted separately. Means and deviations are calculated once per retained
+bird-season, after restricting the sample to confidently AFY observations. The
+models estimate a shared within-individual slope, rather than individual plasticity
+slopes. No covariate effects on the shared transition-steepness parameter are tested.
 
-- [`banded_dotterel_moult.qmd`](banded_dotterel_moult.qmd): source document for the full reproducible workflow
-- [`banded_dotterel_moult.html`](banded_dotterel_moult.html): rendered HTML companion
-- [`data/moult_breeding_KK_data.rds`](data/moult_breeding_KK_data.rds): main photo-level molt and breeding dataset
-- [`data/breeding_KK_data.rds`](data/breeding_KK_data.rds): bird-season breeding phenology dataset
-- [`data/nests_KK_data.rds`](data/nests_KK_data.rds): nest dataset used for the breeding-period overlay in Figure 1b
-- `out/`: saved `brms` model objects used to reproduce the manuscript tables and figures without refitting
-- [`figs/fig1a.png`](figs/fig1a.png): static manuscript panel used for Figure 1a
-- [`figs/fig_1.png`](figs/fig_1.png): overview image displayed in this README
+## Render from a fresh clone
 
-![Overview figure from the manuscript companion](figs/fig_1.png)
+1. Clone or download the repository and keep its directory structure intact. Run R
+   from the repository root.
+2. Install R and the Quarto command-line tool. Install the R packages listed in the
+   setup section of `banded_dotterel_moult.qmd`; the setup checks for missing
+   packages. Figure 4 uses the bundled **Lato Regular** font and the font-rendering
+   packages listed in that setup section.
+3. Run:
 
-## Rendering the document
+   ```bash
+   quarto render banded_dotterel_moult.qmd --to html
+   ```
 
-1. Open the repository root in RStudio or render from the command line.
-2. Install the R packages checked at the top of `banded_dotterel_moult.qmd`.
-3. Render `banded_dotterel_moult.qmd`.
+The supplied data and fitted models are read during rendering. Tables and plots
+are regenerated, and derived CSV and figure files are written to `out/` and
+`figs/`. These generated files are not all tracked. The HTML embeds its images,
+styles, scripts and mathematical notation so it can be read without the source
+folders or an internet connection.
 
-The document is configured so that normal rendering uses the saved model objects
-already included in the repository. A working `cmdstanr` plus CmdStan
-installation is only needed if you want to rerun the time-consuming model
-fitting chunks.
+A working `cmdstanr` and CmdStan installation is required only for refitting.
+All eight reported models use four chains of 10,000 iterations, with 5,000 warmup
+iterations per chain and the `cmdstanr` backend. The document checks these settings
+against the saved fits and reports diagnostics and the render environment.
+
+## Data, models and helper scripts
+
+Only the inputs and supporting code needed for the reported analyses are included.
+Rendering and refitting start from the supplied analysis-ready `.rds` data. Local
+manuscript drafts, historical preparation files, retired fits and exploratory
+analyses are excluded.
+
+- `data/*.rds`: analysis-ready photographic, bird-season and nest data.
+- `data/Scoring - test.xlsx`: original observer-agreement worksheet.
+- The three `Kaikoura_Dotterel_*.xlsx` workbooks listed in the document: nest-visit
+  inputs used to count recorded breeding attempts.
+- `R/scoring_validation_correlations.R`: parsing and observer-agreement calculations.
+- `assets/fonts/`: Lato Regular and its SIL Open Font License, included so Figure 4
+  does not depend on a locally installed font. Source: [Google Fonts](https://github.com/google/fonts/tree/main/ofl/lato).
+- `scripts/run_afy_within_individual_breeding_phenology_models.R`: optional refitting
+  and centering checks for the three main AFY models.
+- `scripts/run_afy_sex_last_breeding_interaction_2026-11-18.R`: optional refitting and
+  centering checks for the supplementary AFY sex interaction.
+- `scripts/export_figure_s1_panels_2026-11-20.R`: regeneration of the six Figure S1
+  PNGs and combined PDF.
+- `figs/Figure_S1_for_Word_2026-11-20/`: the six PNG panels displayed in Figure S1.
+  The export script regenerates these panels and their combined PDF from the data.
+
+The saved models used by the document are:
+
+| File in `out/` | Model |
+| --- | --- |
+| `sex_mod_.rds` | Sex and season |
+| `sex_age_class_mod_2.rds` | Sex, age class and season |
+| `sex_migratory_status_mod_.rds` | Sex, migratory status and season |
+| `sex_first_breed_within_individual_afy_mod_.rds` | AFY first observed breeding date |
+| `sex_last_nest_within_individual_afy_mod_.rds` | AFY last nest date |
+| `sex_last_breed_within_individual_afy_mod_.rds` | AFY last observed breeding date |
+| `afy_sex_last_breeding_interaction_2026-11-18/model.rds` | AFY sex-by-mean and sex-by-deviation interactions |
+| `sex_migratory_interaction_mod_.rds` | Sex-by-migratory-status interaction |
+
+Each saved model contains `fitted_model` (a `brmsfit`) and its analysis `data`.
+AFY models also retain the predictor, photograph-date scaling reference and
+midpoint-to-days conversion. See the document's reproducibility section for the
+complete input manifest, fitting calls, seeds and guidance for applying the
+approach to another system.
+
+## Plot corrections still pending
+
+This repository preserves the fitted models and the numerical analyses. The
+following plotting corrections remain to be completed before final submission:
+
+- Correct calendar-date back-transformations in Figures 1 and 3 and use a consistent
+  reference season for Figure 3.
+- Reconcile the 2,285 raw records currently supplied to plotting layers with the
+  1,646 distinct scored observations used in the full sex-specific model.
+- Update Figure 2's illustrative midpoint and steepness values to the current
+  posterior medians and revise its caption accordingly.
+
+The same limitations are identified beside the relevant figures in the analysis.
+Two generated filenames retain earlier numbering:
+`figs/Figure5_afy_components_revision3.pdf` and its PNG show the current Figure 4,
+and `figs/FigS3.pdf` shows the current Figure S2. These names do not denote
+additional manuscript figures. Figure S1 already has consistent panel widths and
+both legends.
+
+## AI use
+
+AI tools assisted with R code, model implementation, documentation and parts of
+the writing. The author retained responsibility for the analytical decisions,
+interpretation and final wording. The full disclosure is included in the analysis
+companion and manuscript.
