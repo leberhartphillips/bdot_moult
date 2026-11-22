@@ -1,6 +1,6 @@
 ---
-title: "Age class and late reproductive activity predict delayed post-breeding ornamental molt in a partially migratory shorebird"
-date: "August 7, 2026"
+title: "Repeatable ornament expression and limited evidence for breeding-related plasticity in molt timing"
+date: "November 22, 2026"
 author:
  - name: Luke Eberhart-Hertel
    orcid: 0000-0001-7311-6088
@@ -45,13 +45,14 @@ affiliations:
 format:
   html:
     toc: true
-    code-fold: show
-    code-summary: "Fold code"
+    code-fold: true
+    code-summary: "Show R code"
     code-tools: true
-    html-math-method: katex
+    html-math-method: mathml
     self-contained: true
     highlight-style: github
     theme: Cosmo
+keep-md: true
 execute:
   warning: false
   cache: false
@@ -64,6 +65,7 @@ editor:
 
 ```{r, include=FALSE}
 knitr::opts_chunk$set(cache = FALSE)
+set.seed(20261121)
 options(repos = c(CRAN = "https://cran.rstudio.com"))
 ```
 
@@ -85,7 +87,12 @@ packages_required_in_project <- c(
   "tidybayes",
   "performance",
   "posterior",
-  "ggtext"
+  "ggtext",
+  "readxl",
+  "knitr",
+  "systemfonts",
+  "sysfonts",
+  "showtext"
 )
 
 optional_packages_for_refitting <- c("cmdstanr")
@@ -140,9 +147,44 @@ get_mode <- function(x) {
 }
 ```
 
+## Using this analysis companion {#using-this-companion}
+
+We jointly estimated baseline ornament expression and post-breeding molt midpoint from repeated photographs of marked banded dotterels. We first compared sex, age class and migratory status. We then examined breeding-related plasticity in confidently after-first-year birds by separating differences among individuals from seasonal changes within the same birds. Throughout, **adult includes both first-year and after-first-year birds**. We use AFY specifically for the after-first-year sample.
+
+### Render the completed analyses
+
+1. Keep the repository folders together and open R in the project root, which contains this `.qmd` file.
+2. Install the packages listed under [Reproducibility details](#reproducibility-details). The setup chunk checks for missing packages before loading data.
+3. Render with Quarto from the project root:
+
+```{.bash}
+quarto render banded_dotterel_moult.qmd --to html
+```
+
+Rendering reads the completed model objects in `out/`. **No model is fitted when the document is rendered.** Model-fitting chunks are displayed with `eval=FALSE`. They require `cmdstanr` and CmdStan if run manually. Expand “Show R code” beside each analysis to inspect its implementation, or use the Code menu to view the complete source.
+
+### Where to find the manuscript outputs
+
+| Manuscript output | Analysis or display in this document |
+|---|---|
+| Table 1 | [Sex, age class, migratory status, season and repeatability](#table-1) |
+| Table 2 | [AFY among- and within-individual breeding–molt models](#afy-breeding-models) |
+| Table S1 | [Sex-by-breeding-date and sex-by-migratory-status interactions](#supplementary-interactions) |
+| Figure 1 | [Scoring scheme](#figure-1a) and [raw observations and example trajectories](#figure-1b) |
+| Figure 2 | [Nonlinear trajectory schematic](#figure-2) |
+| Figure 3 | [State-specific trajectories and posterior distributions](#figure-3) |
+| Figure 4 | [AFY slope estimates](#figure-4) |
+| Figure S1 | [Six sex- and season-specific observation panels](#figure-s1) |
+| Figure S2 | [Approximate power analysis](#migration-power) |
+| Breeding-date ranges and final local scores | [Recorded breeding dates](#breeding-date-records) and [last local photographs](#last-local-photographs) |
+
+::: {.callout-note title="Plot updates remain pending"}
+The saved fits and numerical results are retained. Calendar-date back-transformations in Figures 1 and 3, reconciliation of raw plotting records with the distinct observations used for fitting, and replacement of Figure 2's illustrative parameters with current posterior medians remain pending. The plotting code and limitations are identified beside the relevant figures. Figure S1 uses the completed panels with consistent widths and both legends.
+:::
+
 ## Data import and sample summary
 
-We used repeated photographs from an individually marked breeding population at Kaikoura to ask how the expression of the rufous breast band and the timing of its post-breeding molt varies with sex, age, migratory strategy, and breeding phenology. Our full dataset spanned three breeding seasons and was linked to an individual's breeding records and (if known) their age and migratory status. This section loads the full dataset used throughout the markdown and gives a brief summary of seasonal coverage and sample size before proceeding to the hypotheses and predictions, analysis, and results.
+We used repeated photographs from an individually marked breeding population at Kaikōura to assess variation in baseline rufous-band expression and the timing of its post-breeding replacement. The photographic dataset spans the 2021–2022, 2022–2023 and 2023–2024 breeding seasons. We linked photographs to breeding records and, where available, age class and migratory status. The following summaries distinguish raw photographic records from the distinct scored observations used in fitting.
 
 ```{r}
 dat_breeding <-
@@ -216,7 +258,7 @@ dat_breeding %>%
   summarise(n())
 ```
 
-total, mean, and SD of photos for each individual per season
+Total, mean and standard deviation of distinct scored observations per bird-season:
 ```{r, echo=FALSE}
 dat_breeding %>%
   # subset to columns of interest
@@ -236,7 +278,7 @@ dat_breeding %>%
   distinct(total_photo, mean_photos_per_ind_per_season, sd_photos_per_ind_per_season)
 ```
 
-max and min number of photos per individual per season
+Maximum and minimum numbers of distinct scored observations per bird-season:
 ```{r, echo=FALSE}
 dat_breeding %>%
   # subset to columns of interest
@@ -258,26 +300,28 @@ dat_breeding %>%
 ```
 
 ### Table of scored photos
-Note, in the analysed dataset, for a given individual, each date had only one score, hence the larger sample shown in this table.
+The table below retains the raw photographic records. For fitting, we collapse records with identical bird, date, score, sex and season values, then remove missing values required by the model. Different scores on the same date are not automatically collapsed. The full sex-specific model contains 1,646 distinct scored observations, whereas the existing raw-data plotting layers contain 2,285 records. Reconciliation of those plotting layers is deferred.
 
 #### Variable definitions
 
-- <code>sourcefile</code>: the directory path to the original photo scored from Ailsa's catalogue
+- <code>sourcefile</code>: the original photograph path in the catalogue
 - <code>rings_comb_raw</code>: the original 4-band code in the raw dataset, including occasional duplicate notations for the same bird
 - <code>rings_comb</code>: the simplified individual identifier used throughout the analyses (`rings_comb_simp`)
 - <code>score</code>: the score of the rufous breast band according to the 1-7 scheme shown below
 - <code>date</code>: the date of the photo (extracted from the photo's metadata)
-- <code>date_J</code>: the Julian date of the photo, shifted to have an July 1 origin for the autral summer
+- <code>date_J</code>: the Julian date of the photo, shifted to span the austral summer
 - <code>sex</code>: sex based on plumage (M or F)
 - <code>season</code>: breeding season of the given photo
 - <code>migratory_status</code>: Resident (R) or migrant (M) classified from satellite tracking and/or winter resightings
+- <code>age_class</code>: FY (hatched in the previous breeding season) or AFY (known to be older from hatch histories or adult marking in an earlier season). Birds first marked as adults have unknown age class in that season unless hatch history establishes it.
+- <code>age_class_source</code>: the evidence used for assigning age class
 - <code>age</code>: known age in years at the time of the photo (only available for those that were banded locally as chicks and recruited)
-- <code>first_date_breeding_final</code>: first date seen incubating (raw date)
-- <code>last_date_breeding_final</code>: last date seen incubating or brooding (raw date)
-- <code>last_nest_first_obs</code>: initiation date of last nest (raw date)
-- <code>first_breeding_date_J_snum</code>: first date seen incubating (season scaled Julian date, shifted for austral summer)
-- <code>last_breeding_date_J_snum</code>: last date seen incubating or brooding (season scaled Julian date, shifted for austral summer)
-- <code>last_nest_first_obs_J_snum</code>: initiation date of last nest (season scaled Julian date, shifted for austral summer)
+- <code>first_date_breeding_final</code>: first recorded incubation or brood-care date, consolidated from field visits and nest records (raw date)
+- <code>last_date_breeding_final</code>: last recorded incubation or brood-care date, consolidated from field visits and nest records (raw date)
+- <code>last_nest_first_obs</code>: last nest date, combining an earlier estimated laying date when available with first observation otherwise (raw date)
+- <code>first_breeding_date_J_snum</code>: first recorded breeding date (season-centered Julian date, shifted for austral summer)
+- <code>last_breeding_date_J_snum</code>: last recorded breeding date (season-centered Julian date, shifted for austral summer)
+- <code>last_nest_first_obs_J_snum</code>: last nest date (season-centered Julian date, shifted for austral summer)
 
 ```{r, echo=FALSE}
 dat_breeding %>%
@@ -318,7 +362,7 @@ dat_breeding %>%
   datatable(class = 'cell-border stripe', rownames = FALSE, filter = 'top')
 ```
 
-### Figure 1a - example photos and scoring scheme
+### Figure 1a — example photos and scoring scheme {#figure-1a}
 
 The manuscript's Figure 1a uses a static photo montage to show the field images
 and the 1-7 scoring scheme used for the rufous breast band. The asset is kept
@@ -337,246 +381,196 @@ dat_breeding %>%
   arrange(desc(n_unique_scores))
 ```
 
-### Figure S1 - raw data distributions of sex- and season-specific samples
+### Agreement among observers
 
-These six panels correspond to the supplementary raw-data overview described in
-the manuscript caption for Figure S1.
+The scoring-validation workbook contains photographs scored by three observers. Observer A provided the scores used in the analyses. We reproduce the two Spearman rank correlations from the existing validation script. Ranged scores were converted to their midpoint before calculating the correlations. Each comparison uses 18 photographs.
 
-#### 2021-2022 season data
-
-```{r, fig.height=9, echo=FALSE}
-# 2021-2022 season data
-female_2021 <- ggplot(data = dat_breeding %>%
-                        filter(season == 2021 & sex == "F")) +
-  geom_point(aes(y = 1, x = date, fill = as.numeric(score)),
-             pch = 21, color = "black", size = 3) +
-  facet_wrap(. ~ reorder(rings_comb, n_photos, decreasing = TRUE),
-             ncol = 1, strip.position = "right") +
-  scale_fill_gradient(high = "#cc4c02", low = "white") +
-  theme_bw() +
-  theme(axis.title.y = element_blank(),
-        axis.text.y = element_blank(),
-        panel.grid.major.y = element_blank(),
-        panel.grid.minor = element_blank(),
-        axis.ticks = element_blank(),
-        strip.text.y.right = element_text(angle = 0),
-    panel.border = element_rect(linetype = "solid", colour = "grey90"),
-    strip.background = element_rect(color = "grey90", fill = "grey90"),
-    panel.grid.major.x = element_line(color = "grey30")) +
-  scale_x_date(date_labels = "%W", expand = c(0.01, 0.01),
-               date_breaks = "3 week",
-               limits = c(as.Date("2021-07-05"), as.Date("2022-05-01"))) +
-  xlab("week") +
-  ggtitle("Females from the 2021-2022 breeding season in Kaikoura")
-
-female_2021
+```{r scoring-validation-load, results='hide'}
+# This script reads the workbook and calculates correlations. It does not save
+# changes to the workbook or to the model data.
+invisible(capture.output(source(here("R/scoring_validation_correlations.R"),
+                                local = TRUE)))
+scoring_validation_results <- results %>%
+  filter(method == "spearman") %>%
+  transmute(Comparison = c("Observer A versus B", "Observer A versus C"),
+            Photographs = n, `Spearman rho` = estimate, `P value` = p_value)
 ```
 
-```{r, fig.height=8, echo=FALSE}
-male_2021 <- ggplot(data = dat_breeding %>%
-                      filter(season == 2021 & sex == "M")) +
-  geom_point(aes(y = 1, x = date, fill = as.numeric(score)),
-             pch = 21, color = "black", size = 3) +
-  facet_wrap(. ~ reorder(rings_comb, n_photos, decreasing = TRUE),
-             ncol = 1, strip.position = "right") +
-  scale_fill_gradient(high = "#cc4c02", low = "white") +
-  theme_bw() +
-  theme(axis.title.y = element_blank(),
-        axis.text.y = element_blank(),
-        panel.grid.major.y = element_blank(),
-        panel.grid.minor = element_blank(),
-        axis.ticks = element_blank(),
-        strip.text.y.right = element_text(angle = 0),
-    panel.border = element_rect(linetype = "solid", colour = "grey90"),
-    strip.background = element_rect(color = "grey90", fill = "grey90"),
-    panel.grid.major.x = element_line(color = "grey30")) +
-  scale_x_date(date_labels = "%W", expand = c(0.01, 0.01),
-               date_breaks = "3 week",
-               limits = c(as.Date("2021-07-05"), as.Date("2022-05-01"))) +
-  xlab("week") +
-  ggtitle("Males from the 2021-2022 breeding season in Kaikoura")
-
-male_2021
+```{r scoring-validation-table, echo=TRUE}
+knitr::kable(scoring_validation_results, digits = c(NA, 0, 3, 12))
 ```
 
-#### 2022-2023 season data
+The complete parsing and correlation code is shown for reproducibility:
 
-```{r, fig.height=10, echo=FALSE}
-# 2022-2023 season data (not as good coverage as the previous season)
-female_2022 <- ggplot(data = dat_breeding %>%
-                        filter(season == 2022 & sex == "F")) +
-  geom_point(aes(y = 1, x = date, fill = as.numeric(score)),
-             pch = 21, color = "black", size = 3) +
-  facet_wrap(. ~ reorder(rings_comb, n_photos, decreasing = TRUE),
-             ncol = 1, strip.position = "right") +
-  scale_fill_gradient(high = "#cc4c02", low = "white") +
-  theme_bw() +
-  theme(axis.title.y = element_blank(),
-        axis.text.y = element_blank(),
-        panel.grid.major.y = element_blank(),
-        panel.grid.minor = element_blank(),
-        axis.ticks = element_blank(),
-        strip.text.y.right = element_text(angle = 0),
-    panel.border = element_rect(linetype = "solid", colour = "grey90"),
-    strip.background = element_rect(color = "grey90", fill = "grey90"),
-    panel.grid.major.x = element_line(color = "grey30")) +
-  scale_x_date(date_labels = "%W", expand = c(0.01, 0.01),
-               date_breaks = "3 week",
-               limits = c(as.Date("2022-07-05"), as.Date("2023-05-01"))) +
-  xlab("week") +
-  ggtitle("Females from the 2022-2023 breeding season in Kaikoura")
-
-female_2022
-
+```{r scoring-validation-script, echo=FALSE, results='asis'}
+cat("```r\n", paste(readLines(here("R/scoring_validation_correlations.R")),
+                        collapse = "\n"), "\n```\n", sep = "")
 ```
 
-```{r, fig.height=7, echo=FALSE}
-male_2022 <- ggplot(data = dat_breeding %>%
-                      filter(season == 2022 & sex == "M")) +
-  geom_point(aes(y = 1, x = date, fill = as.numeric(score)),
-             pch = 21, color = "black", size = 3) +
-  facet_wrap(. ~ reorder(rings_comb, n_photos, decreasing = TRUE),
-             ncol = 1, strip.position = "right") +
-  scale_fill_gradient(high = "#cc4c02", low = "white") +
-  theme_bw() +
-  theme(axis.title.y = element_blank(),
-        axis.text.y = element_blank(),
-        panel.grid.major.y = element_blank(),
-        panel.grid.minor = element_blank(),
-        axis.ticks = element_blank(),
-        strip.text.y.right = element_text(angle = 0),
-    panel.border = element_rect(linetype = "solid", colour = "grey90"),
-    strip.background = element_rect(color = "grey90", fill = "grey90"),
-    panel.grid.major.x = element_line(color = "grey30")) +
-  scale_x_date(date_labels = "%W", expand = c(0.01, 0.01),
-               date_breaks = "3 week",
-               limits = c(as.Date("2022-07-05"), as.Date("2023-05-01"))) +
-  xlab("week") +
-  ggtitle("Males from the 2022-2023 breeding season in Kaikoura")
+### Figure S1 — raw observations by sex and season {#figure-s1}
 
-male_2022
+**Figure S1.** Raw scored observations by sex and breeding season. Each row represents a color-marked bird and each point a scored observation. Within each panel, migrants appear at the top, residents in the middle and birds of unknown migratory status at the bottom. Band-combination strips are red, green and grey, respectively. Point fill indicates moult score, ranging from 1 (no rufous band) to 7 (a complete, sharply defined rufous band). Both legends appear beside each panel. Week 07 corresponds to mid-February. The date of a bird's last photograph does not identify its departure date.
 
+The six panels below are the completed exports used in the manuscript. They share fixed panel, identifier-strip and legend widths. The script retains the current raw photographic records. It does not implement the deferred reconciliation of plotting records with model observations.
+
+```{r figure-s1-completed-panels, echo=TRUE, out.width='100%'}
+s1_files <- file.path(
+  "figs", "Figure_S1_for_Word_2026-11-20",
+  paste0("Figure_S1_", rep(c("2021-2022", "2022-2023", "2023-2024"), each = 2),
+         "_", rep(c("females", "males"), 3), ".png")
+)
+stopifnot(all(file.exists(here(s1_files))))
+knitr::include_graphics(here(s1_files))
 ```
 
-#### 2023-2024 season data
-```{r, fig.height=10, echo=FALSE}
-# 2023-2024 season data
-female_2023 <- ggplot(data = dat_breeding %>%
-                        filter(season == 2023 & sex == "F")) +
-  geom_point(aes(y = 1, x = date, fill = as.numeric(score)),
-             pch = 21, color = "black", size = 3) +
-  facet_wrap(. ~ reorder(rings_comb, n_photos, decreasing = TRUE),
-             ncol = 1, strip.position = "right") +
-  scale_fill_gradient(high = "#cc4c02", low = "white") +
-  theme_bw() +
-  theme(axis.title.y = element_blank(),
-        axis.text.y = element_blank(),
-        panel.grid.major.y = element_blank(),
-        panel.grid.minor = element_blank(),
-        axis.ticks = element_blank(),
-        strip.text.y.right = element_text(angle = 0),
-    panel.border = element_rect(linetype = "solid", colour = "grey90"),
-    strip.background = element_rect(color = "grey90", fill = "grey90"),
-    panel.grid.major.x = element_line(color = "grey30")) +
-  scale_x_date(date_labels = "%W", expand = c(0.01, 0.01),
-               date_breaks = "3 week",
-               limits = c(as.Date("2023-07-01"), as.Date("2024-05-01"))) +
-  xlab("week") +
-  ggtitle("Females from the 2023-2024 breeding season in Kaikoura")
+To regenerate the six PNGs and the combined vector PDF, run the existing export script from the project root:
 
-female_2023
+```{r figure-s1-export-instructions, eval=FALSE}
+source(here("scripts/export_figure_s1_panels_2026-11-20.R"))
 ```
 
-```{r, fig.height=6, echo=FALSE}
-male_2023 <- ggplot(data = dat_breeding %>%
-                      filter(season == 2023 & sex == "M")) +
-  geom_point(aes(y = 1, x = date, fill = as.numeric(score)),
-             pch = 21, color = "black", size = 3) +
-  facet_wrap(. ~ reorder(rings_comb, n_photos, decreasing = TRUE),
-             ncol = 1, strip.position = "right") +
-  scale_fill_gradient(high = "#cc4c02", low = "white") +
-  theme_bw() +
-  theme(axis.title.y = element_blank(),
-        axis.text.y = element_blank(),
-        panel.grid.major.y = element_blank(),
-        panel.grid.minor = element_blank(),
-        axis.ticks = element_blank(),
-        strip.text.y.right = element_text(angle = 0),
-    panel.border = element_rect(linetype = "solid", colour = "grey90"),
-    strip.background = element_rect(color = "grey90", fill = "grey90"),
-    panel.grid.major.x = element_line(color = "grey30")) +
-  scale_x_date(date_labels = "%W", expand = c(0.01, 0.01),
-               date_breaks = "3 week",
-               limits = c(as.Date("2023-07-05"), as.Date("2024-05-01"))) +
-  xlab("week") +
-  ggtitle("Males from the 2023-2024 breeding season in Kaikoura")
+The plotting implementation is shown below so that panel ordering, status colours and fixed widths can be adapted without changing the model code.
 
-male_2023
+```{r figure-s1-script, echo=FALSE, results='asis'}
+cat("```r\n", paste(readLines(here("scripts/export_figure_s1_panels_2026-11-20.R")),
+                        collapse = "\n"), "\n```\n", sep = "")
 ```
 
-## Hypotheses and predictions
-We tested the following four hypotheses. The 'Sex' and 'Breeding phenology' models used the full dataset, while the 'Age class' and 'Migratory status' models used subsets of the full dataset for individuals of known age or migratory status (see Table 1 for sample sizes).
+## Biological questions and predictions
 
-### Sex
-- H1: sexual dichromatism in the rufous band score and sex-specific molt timing
-- P1a: males tend to have higher rufous band scores than females, following the general patter of moderate sexual dichromatism in other Charadriidae plovers
-- P1b: no difference in post-breeding molt timing due to the socially monogamous and bi-parental care mating system
+We compared sex, age class and migratory status as predictors of baseline ornament expression and molt midpoint (Table 1). Males were expected to express higher rufous-band scores. Shared parental care provided a basis for expecting broadly similar timing constraints between sexes, although equal participation does not establish equal reproductive costs. Earlier replacement in first-year birds could reflect age-related differences in feather wear or reproductive schedules. Departure could also constrain the schedules of migrants. These mechanisms were not measured directly.
 
-### Breeding phenology
-- H2: post-breeding molt is dependent upon breeding phenology
-- P2a: individuals that breed earlier molt earlier due a generally more advanced reproductive schedule
-- P2b: individuals that are still engaged in parental care late in the season molt later
-- P2c: individuals that initiate late nests molt later
+The AFY models address a separate question about breeding-related plasticity (Table 2). Do birds with later average breeding schedules also molt later, and does the same bird shift its molt in seasons when it breeds later than usual? We examined first observed breeding date, last nest date and last observed breeding date separately. The age-class difference in midpoint and the limited linked breeding records for first-year birds motivated restricting these comparisons to confidently AFY bird-seasons. The supplementary models assess sex differences in the among- and within-individual last-breeding-date associations and in the resident–migrant contrast (Table S1).
 
-### Age class
-- H3: age-class structures the molt schedule and rufous band expression
-- P3a: first-year birds express lower rufous band scores in comparison to after-first-year birds due to more complete pigmentation during feather growth in older birds
-- P3b: first-year birds molt earlier than after-first-year birds because the flight feathers of first-years are older (and more worn) than after-first-years, which triggers an earlier complete post-breeding molt program
+## Nonlinear hierarchical model {#model-equations}
 
-### Migratory strategy
-- H4: migratory strategy structures the molt schedule and rufous band expression
-- P4a: no strategy-dependent variation in rufous band expression
-- P4b: migrants molt earlier than residents due to their more constrained fall migration schedule
+### Observation model and seasonal trajectory
 
-## Non-linear mixed effects model
-
-We scored the rufous breast band on a seven-point scale, so the response is bounded and declines through the season as birds transition from their breeding ("alternate") plumage into their non-breeding plumage ("basic") via the complete post-breeding molt.
-
-We fit the same nonlinear trajectory for all four main models and let the predictors explain variation in the starting score and the timing of the decline.
-
-We modeled the decline in rufous band score with a nonlinear mixed-effects curve. Because we centered and scaled Julian date within season before fitting, we write the seasonal date term as $x$. For observation $j$ on bird $i$,
+Let $y_{ist}$ denote the rufous-band score of bird $i$ in season $s$ at photographic observation $t$. We treated the seven-point scores as a continuous response with Gaussian observation error:
 
 $$
-y_{ij} \sim \mathrm{Normal}(\mu_{ij}, \sigma).
+y_{ist}\sim\mathcal{N}(\mu_{ist},\sigma^2). \qquad\text{(1)}
+$$
+
+We jointly estimated baseline expression, $\beta_{is}$, and the midpoint of its post-breeding decline, $t_{0,is}$:
+
+$$
+\mu_{ist}=1+(\beta_{is}-1)
+\left(1-\frac{1}{1+\exp[-k(z_{ist}-t_{0,is})]}\right). \qquad\text{(2)}
+$$
+
+Here, $z_{ist}$ is the photographic date, centered and divided by its standard deviation within season. We use $z$ for photographic date and $x$ below for breeding date to distinguish the two predictors. Expected scores decline from $\beta_{is}$ towards 1. The positive parameter $k$ controls transition steepness. Photographic coverage within individuals was insufficient to estimate covariate effects on $k$, so every model retains one shared steepness parameter. The Gaussian likelihood describes variation around the trajectory and does not impose hard bounds of 1 and 7 on observations or predictions.
+
+The R expression is the same as equation (2), with `baseline` representing $\beta$:
+
+```{r trajectory-equation-in-r, eval=FALSE}
+# z_ist = date_J_scaled, beta_is = baseline, t_0,is = t0
+mu <- 1 + (baseline - 1) *
+  (1 - 1 / (1 + exp(-k * (date_J_scaled - t0))))
+# family = gaussian() estimates sigma as an observation-level SD.
+```
+
+### Fixed effects and repeated observations
+
+For baseline expression and midpoint, we included fixed effects and deviations among birds and bird-seasons:
+
+$$
+\beta_{is}=\alpha^{(\beta)}+
+\mathbf{X}_{is}^{(\beta)}\boldsymbol{\gamma}^{(\beta)}+
+ u_i^{(\beta)}+v_{is}^{(\beta)}, \qquad\text{(3)}
 $$
 
 $$
-\mu_{ij} =
-1 + (\beta_{ij} - 1)
-\left(
-1 - \frac{1}{1 + \exp[-k(x_{ij} - t_{0,ij})]}
-\right).
+t_{0,is}=\alpha^{(t_0)}+
+\mathbf{X}_{is}^{(t_0)}\boldsymbol{\gamma}^{(t_0)}+
+ u_i^{(t_0)}+v_{is}^{(t_0)}. \qquad\text{(4)}
 $$
 
-The parameter $\beta$ is the rufous band score prior to the post-breeding molt, $t_0$ is the midpoint of the decline to the non-breeding plumage, and $k$ controls how steep/fast the molt progresses. Early in the season ($x \ll t_0$), expected scores are close to $\beta$; late in the season ($x \gg t_0$), expected scores approach 1 (i.e. full non-breeding plumage). This function attempts to match the biology of post-breeding moult, in which birds move from full breeding plumage toward full non-breeding plumage over time.
-
-In the sex-specific model, we allowed both $\beta$ and $t_0$ to depend on sex and to vary among birds and bird-by-season combinations, while keeping $k$ common across birds (i.e., our photographic sampling was too coarse to robustly assess sources of variation in molt speed):
+The design vectors $\mathbf{X}$ contain the fixed effects specified for each parameter. All models include sex for baseline and midpoint, and season for midpoint. The age-class and migration models add the corresponding state to both parameters. The AFY models add breeding-date components to midpoint only. We estimated a correlation between the individual deviations in baseline and midpoint:
 
 $$
-\begin{aligned}
-\beta_{ij} &= \alpha_{\beta} + \mathbf{X}_{ij}\boldsymbol{\gamma}_{\beta} + b_{\beta,i} + b_{\beta,is}, \\
-t_{0,ij} &= \alpha_{t_0} + \mathbf{X}_{ij}\boldsymbol{\gamma}_{t_0} + b_{t_0,i} + b_{t_0,is}, \\
-k &= \alpha_k .
-\end{aligned}
+\rho_{\beta,t_0}=\operatorname{cor}
+\left(u_i^{(\beta)},u_i^{(t_0)}\right). \qquad\text{(5)}
 $$
 
-Here, $\mathbf{X}$ denotes the relevant fixed effects for a given model. In the sex-only model, $\mathbf{X}$ contains sex; in the other models, we added breeding phenology, age class, or migratory status. We kept the same nonlinear form throughout so that differences among models reflect changes in predictors of $\beta$ and $t_0$, not changes in the underlying molt curve.
+The paired individual deviations follow a zero-mean bivariate normal distribution, with covariance $\rho_{\beta,t_0}\sigma_{u,\beta}\sigma_{u,t_0}$. Bird-season deviations are zero-mean normal terms. We estimated their variances separately for the two parameters, without a bird-season correlation term.
 
-We used an informative prior on $\beta$ (i.e., <code>normal(5.5, 1)</code>; centering the prior near the upper half of the 1-7 scoring scale and keeping it positive), weakly informative priors on $t_0$ and $k$, and exponential priors on the group-level standard deviations. This combination stabilized estimation while still allowing substantial variation among birds and among bird-by-season combinations when the data supported it.
+| Mathematical term | R term | Role |
+|---|---|---|
+| $y_{ist}$ | `score` | Observed rufous-band score |
+| $z_{ist}$ | `date_J_scaled` | Standardized photographic date |
+| $\beta_{is}$ | `baseline` | Ornament expression before replacement |
+| $t_{0,is}$ | `t0` | Midpoint on the standardized date scale |
+| $k$ | `k ~ 1` | Shared transition steepness |
+| $\mathbf{X}\boldsymbol{\gamma}$ | e.g., `sex + season` | Fixed effects for the named parameter |
+| $u_i$ and equation (5) | `(1 | i | rings_comb)` in both parameter formulas | Correlated individual intercepts |
+| $v_{is}$ | `(1 | rings_comb:season)` | Bird-season intercepts for each parameter |
+| $\sigma$ | Gaussian `sigma` | Photographic-score residual SD |
 
-The Figure 1 schematic below shows how $\beta$, $t_0$, and $k$ shape the curve that we fit in every model. We use representative values here so that the roles of the three parameters are easy to interpret.
+The shared label `i` in the two `brms` grouping terms requests the individual correlation in equation (5). It is a grouping label in R, rather than a data column. The complete state-specific formulas are displayed below each dataset.
 
-### Figure 2 - schematic of the non-linear model
+### Separating among- and within-individual breeding associations
+
+Following van de Pol and Wright (2009), we represented each retained breeding date as a bird's mean plus its seasonal deviation. We added both components to the midpoint formula:
+
+$$
+t_{0,is}=\alpha^{(t_0)}+
+\mathbf{X}_{is}^{(t_0)}\boldsymbol{\gamma}^{(t_0)}+
+\gamma_B\bar{x}_i+\gamma_W(x_{is}-\bar{x}_i)+
+ u_i^{(t_0)}+v_{is}^{(t_0)}, \qquad\text{(6)}
+$$
+
+$$
+\bar{x}_i=\frac{1}{n_i}\sum_{s\in S_i}x_{is}. \qquad\text{(7)}
+$$
+
+Here, $x_{is}$ is the stored season-centered breeding date in days, $S_i$ is the set of retained AFY seasons for bird $i$, and $n_i$ is its number of retained seasons. We calculated means after restricting the sample to confidently AFY bird-seasons, using one date per bird-season. Photographs do not receive separate weights in the calculation of a bird's mean. The original seasonal centering is retained. We did not recalculate seasonal means within the AFY subset.
+
+The among-individual coefficient $\gamma_B$ compares birds with different average breeding schedules. The within-individual coefficient $\gamma_W$ describes the common association between a bird's seasonal deviation and its midpoint. It does not estimate a separate response slope for each bird. Birds with one AFY season have a zero deviation and contribute to the among-individual comparison. Annual variation is accounted for through both the season-centered breeding dates and the fixed season effects on midpoint.
+
+The [AFY implementation](#afy-breeding-models) shows the complete construction of `breeding_mean_i`, `breeding_dev_is` and the corresponding `brms` formula. The contrast $\gamma_B-\gamma_W$ is calculated within each posterior draw. Comparing the two slopes directly avoids inferring a difference merely because one credible interval excludes zero and the other includes it.
+
+### Repeatability and derived days per score
+
+For either fitted parameter $\theta\in\{\beta,t_0\}$, adjusted repeatability was
+
+$$
+R_\theta=\frac{\sigma^2_{u,\theta}}
+{\sigma^2_{u,\theta}+\sigma^2_{v,\theta}}.
+$$
+
+The estimates describe consistency across seasons after controlling for the fixed effects included for each parameter. Photographic-score residual variance, $\sigma^2$, describes observations around the trajectory and is excluded from these parameter-level ratios. We compare repeatabilities using paired draws of $R_\beta-R_{t_0}$. Repeatability alone does not measure plasticity in response to changes in breeding phenology.
+
+At midpoint, the magnitude of the trajectory slope is $(\beta-1)k/4$ score units per standardized date unit. Consequently, derived days per score at midpoint are
+
+$$
+D=\frac{4d}{(\beta-1)k},
+$$
+
+where $d$ is the conversion from standardized date units to days. The reported contrasts and derived days per score use the observation-weighted mean of the original seasonal date standard deviations in the corresponding model sample. Calendar midpoints in Table 1 instead use each season's own mean and standard deviation. The AFY fits retain their reporting conversion as `midpoint_days_conversion`.
+
+```{r parameter-summary-equations-in-r, eval=FALSE}
+post <- posterior::as_draws_df(sex_mod$fitted_model)
+R_baseline <- post$sd_rings_comb__baseline_Intercept^2 /
+  (post$sd_rings_comb__baseline_Intercept^2 +
+   post$`sd_rings_comb:season__baseline_Intercept`^2)
+R_midpoint <- post$sd_rings_comb__t0_Intercept^2 /
+  (post$sd_rings_comb__t0_Intercept^2 +
+   post$`sd_rings_comb:season__t0_Intercept`^2)
+R_difference <- R_baseline - R_midpoint
+# weighted_date_scaling() is defined in the posterior-summary code below.
+d <- weighted_date_scaling(sex_mod$data)$weighted_sd
+female_days_per_score <- 4 * d /
+  ((post$b_baseline_Intercept - 1) * post$b_k_Intercept)
+```
+
+### Date transformations and interpretation
+
+The input `date_J` was generated as `as.numeric(format(date + 181, "%j"))` to span the austral breeding season. It is not literally the number of days since 1 July. `date_J_scaled` uses the original full sex-model reference mean and SD within each season, including in restricted samples. The breeding predictors ending in `_snum` are centered within season but remain in days. Their mean and deviation coefficients therefore represent standardized midpoint change per one-day breeding-date change before conversion to days.
+
+The calendar-date plotting inverses in Figures 1 and 3 still require the deferred correction. Their current labels should not be used to reconstruct the season-specific calendar estimates in Table 1.
+
+### Figure 2 — schematic of the nonlinear model {#figure-2}
 ```{r}
 #| code-fold: true
 #| code-summary: "Show code of an example parameterizing the non-linear model"
@@ -649,7 +643,7 @@ fig1 <-
     "text", size = 3,
     family = "sans",
     x = x_k, y = y_k,
-    label = as.expression(bquote("molt rate (" * italic(k) * ") = " * .(round(k, 2)))),
+    label = as.expression(bquote("transition steepness (" * italic(k) * ") = " * .(round(k, 2)))),
     hjust = 0.5,
     vjust = -0.5,
     angle = angle_k + 5
@@ -671,6 +665,8 @@ fig1 <-
   )
 
 fig1
+ggsave(here("figs", "Figure2_schematic_revision3.png"), plot = fig1,
+       width = 5, height = 5, dpi = 300, bg = "white")
 ```
 
 ```{r, eval=FALSE, echo=FALSE}
@@ -683,9 +679,14 @@ ggsave(
 )
 ```
 
+The schematic uses illustrative values $\beta=6$, $t_0=1.45$ and $k=3.31$ on the standardized date scale. They are not the current sex-model posterior medians. Replacing midpoint and steepness with the latest medians is deferred.
+
 ### Shared priors
 
-We use the same prior set in all five non-linear moult models so that
+We used $\alpha^{(\beta)}\sim\mathcal{N}(5.5,1^2)$ and zero-centered normal priors with SD 1 for other baseline coefficients. Midpoint intercept and fixed-effect coefficients received $\mathcal{N}(0,0.5^2)$ priors on the standardized photographic-date scale. We used $k\sim\mathcal{N}(1,0.5^2)$ truncated below at zero. Group-level standard deviations received exponential priors with rate 2. The baseline prior is not truncated at the score bounds. The executable `brms` definitions follow.
+
+
+We use the same prior set in the main and supplementary non-linear moult models so that
 differences among models reflect changes in predictors rather than
 changes in prior assumptions. We define that shared prior set once here
 and reuse it in each `brm()` call below.
@@ -716,21 +717,10 @@ moult_priors <- c(
   prior(exponential(2), nlpar = "t0", class = "sd", group = "rings_comb:season")
 )
 
-# FY-only models do not include the nested bird-by-season random effect,
-# so they need the corresponding subset of priors.
-moult_priors_fy <- c(
-  prior(normal(5.5, 1), nlpar = "baseline", class = "b", coef = "Intercept"),
-  prior(normal(0, 1), nlpar = "baseline", class = "b"),
-  prior(normal(0, 0.5), nlpar = "t0", class = "b", coef = "Intercept"),
-  prior(normal(0, 0.5), nlpar = "t0", class = "b"),
-  prior(normal(1, 0.5), nlpar = "k", lb = 0),
-  prior(exponential(2), nlpar = "baseline", class = "sd", group = "rings_comb"),
-  prior(exponential(2), nlpar = "t0", class = "sd", group = "rings_comb")
-)
 ```
 
 ### Analysis: Sex-specific model
-We first fit a model to the full dataset and asked whether males and females differed in $\beta$ and $t_0$. We used this as the reference model because sex was known for all birds and it gives the cleanest estimate of the post-breeding molt trajectory and baseline expression of the rufous band.
+We first fit a model to the full dataset and asked whether males and females differed in $\beta$ and $t_0$. We used this as the reference model because sex was known for all birds and provides the full-sample estimate of baseline expression and molt timing.
 
 #### dataset
 ```{r}
@@ -747,7 +737,10 @@ dat_sex_mod <- dat_breeding %>%
   as.data.frame()
 ```
 
-#### model formula specification
+#### Model formula specification
+
+The saved model uses females as the sex reference, first-year birds as the age-class reference, and migrants as the migratory-status reference. Season 2021 denotes 2021–2022. The migration and age-class references apply only in the corresponding models. The code retains the supplied factor levels.
+
 ```{r}
 mod_sex <- bf(
   score ~ 1 + (baseline - 1) * (1 - 1 / (1 + exp(-k * (date_J_scaled - t0)))),
@@ -780,11 +773,16 @@ saveRDS(list(fitted_model = fit_mod_sex, data = dat_sex_mod),
         file = here("out/sex_mod_.rds"))
 ```
 
-### Analysis: Breeding Phenology model
-We then retained sex in the model and tested first breeding date, last nest initiation date, and last breeding date as separate predictors of molt timing ($t_0$). Any carry-over effect of breeding should appear first in the timing of the decline, so here we focus on whether an earlier onset of breeding, later nest initiation, or later breeding activity shifts the molt midpoint. We fit the three breeding-phenology predictors singly because they describe related parts of the breeding season and the question here is whether each trait shows evidence for a carry-over association when considered in isolation.
+### Breeding-date records and descriptive coverage {#breeding-date-records}
+
+The complete linked-date dataset provides descriptive breeding-date ranges.
+The main breeding–molt analysis and supplementary sex-by-breeding-date
+interaction below use confidently AFY bird-seasons and separate among-
+from within-individual associations.
 
 #### datasets
-Here we wrangle the full breeding phenology dataset (`dat_breeding_mod`), which is the version used in the main analysis and reported in the paper. The same complete-case dataset is used for the single-predictor breeding-phenology models so the estimates differ only in which breeding trait is entered in the $t_0$ submodel.
+We prepare the complete linked-breeding dataset (`dat_breeding_mod`) for
+the descriptive summaries.
 ```{r}
 # wrangle data
 dat_breeding_mod <- dat_breeding %>%
@@ -813,7 +811,7 @@ breeding_phenology_trait_lookup <- tibble::tribble(
   "first_breeding_date_J_snum", "first_date_breeding_final",
   "First breeding date",
   "last_nest_first_obs_J_snum", "last_nest_first_obs",
-  "Last nest first observed"
+  "Last nest date"
 )
 
 as_breeding_date <- function(x) {
@@ -904,98 +902,84 @@ knitr::kable(
 )
 ```
 
-#### model formula specification
-```{r}
-mod_sex_first_breed_only <- bf(
-  score ~ 1 + (baseline - 1) * (1 - 1 / (1 + exp(-k * (date_J_scaled - t0)))),
-  baseline ~ sex + (1 | i | rings_comb) + (1 | rings_comb:season),
-  t0 ~ sex + season + first_breeding_date_J_snum + (1 | i | rings_comb) + (1 | rings_comb:season),
-  k ~ 1,
-  nl = TRUE
-)
+#### Within-individual breeding-date ranges
 
-mod_sex_last_breed_only <- bf(
-  score ~ 1 + (baseline - 1) * (1 - 1 / (1 + exp(-k * (date_J_scaled - t0)))),
-  baseline ~ sex + (1 | i | rings_comb) + (1 | rings_comb:season),
-  t0 ~ sex + season + last_breeding_date_J_snum + (1 | i | rings_comb) + (1 | rings_comb:season),
-  k ~ 1,
-  nl = TRUE
-)
+For birds represented in at least two seasons, we aligned month and day to a common July–June calendar and calculated each bird's latest minus earliest date. We did not subtract dates in different years directly. The table describes observed activity, rather than confirmed initiation or cessation. Unequal detection of breeding attempts can contribute to the recorded variation.
 
-mod_sex_last_nest_first_obs_only <- bf(
-  score ~ 1 + (baseline - 1) * (1 - 1 / (1 + exp(-k * (date_J_scaled - t0)))),
-  baseline ~ sex + (1 | i | rings_comb) + (1 | rings_comb:season),
-  t0 ~ sex + season + last_nest_first_obs_J_snum + (1 | i | rings_comb) + (1 | rings_comb:season),
-  k ~ 1,
-  nl = TRUE
+```{r within-individual-breeding-date-ranges}
+within_breeding_ranges <- purrr::pmap_dfr(
+  breeding_phenology_trait_lookup,
+  function(trait, date_col, description) {
+    dat_breeding_trait_dates %>%
+      transmute(rings_comb, season, date = .data[[date_col]]) %>% distinct() %>%
+      mutate(common_date = as.Date(paste0(
+        if_else(as.integer(format(date, "%m")) >= 7, "2001-", "2002-"),
+        format(date, "%m-%d")))) %>%
+      group_by(rings_comb) %>%
+      summarise(n_seasons = n_distinct(season),
+                range_days = as.numeric(max(common_date) - min(common_date)),
+                .groups = "drop") %>%
+      filter(n_seasons >= 2) %>%
+      summarise(`Breeding date` = description, Birds = n(),
+                `Median within-individual range (days)` = median(range_days),
+                `Smallest range (days)` = min(range_days),
+                `Largest range (days)` = max(range_days))
+  }
 )
+stopifnot(all(within_breeding_ranges$Birds == 41L))
+knitr::kable(within_breeding_ranges)
 ```
 
-#### fit model
-We fit the three single-predictor breeding phenology models to the full dataset here.
-```{r, eval=FALSE}
-fit_mod_sex_first_breed_only <- brm(
-  formula = mod_sex_first_breed_only,
-  data = dat_breeding_mod,
-  family = gaussian(),
-  prior = moult_priors,
-  control = list(adapt_delta = 0.999, max_treedepth = 15),
-  chains = 4,
-  cores = 4,
-  iter = 10000,
-  warmup = 5000,
-  backend = "cmdstanr",
-  seed = 141
-)
+A one-day range means that the bird's earliest and latest dates differed by one day across its retained seasons. These ranges describe the full linked-breeding sample. They do not change the 47-bird AFY model sample.
 
-fit_mod_sex_last_breed_only <- brm(
-  formula = mod_sex_last_breed_only,
-  data = dat_breeding_mod,
-  family = gaussian(),
-  prior = moult_priors,
-  control = list(adapt_delta = 0.999, max_treedepth = 15),
-  chains = 4,
-  cores = 4,
-  iter = 10000,
-  warmup = 5000,
-  backend = "cmdstanr",
-  seed = 142
-)
+#### Recorded breeding attempts
 
-fit_mod_sex_last_nest_first_obs_only <- brm(
-  formula = mod_sex_last_nest_first_obs_only,
-  data = dat_breeding_mod,
-  family = gaussian(),
-  prior = moult_priors,
-  control = list(adapt_delta = 0.999, max_treedepth = 15),
-  chains = 4,
-  cores = 4,
-  iter = 10000,
-  warmup = 5000,
-  backend = "cmdstanr",
-  seed = 143
+We counted distinct nest identifiers per bird-season from the three original nest-visit worksheets. We retained records of occupied nests or observed chicks, following the existing data-preparation script. The code preserves its sex-specific identifiers for reused band combinations. We then matched those records to the same 132 bird-seasons used for the breeding-date summaries.
+
+```{r recorded-breeding-attempts}
+visit_files <- c(
+  "data/Kaikoura_Dotterel_2021_Feb2022_upd_Nov22_Locations.xlsx",
+  "data/Kaikoura_Dotterel_Jan23_upd.xlsx",
+  "data/Kaikoura_Dotterel_Feb2024_upd.xlsx"
 )
+visit_sheets <- c("Kaikoura_NestVisit2021_1", "Kaikoura_NestVisit_1",
+                  "Kaikoura_NestVisit_1")
+nest_parent_records <- bind_rows(lapply(seq_along(visit_files), function(j) {
+  readxl::read_excel(here(visit_files[j]), sheet = visit_sheets[j],
+                    col_types = "text") %>%
+    filter(`Nest Status` == "Occupied" |
+           as.numeric(`Number of chicks seen`) > 0 |
+           as.numeric(`Number of chicks seen`) == -1) %>%
+    transmute(season = as.character(2020 + j),
+              nest_id = sub("^([^[:space:]]+).*", "\\1", NestID),
+              parent = str_extract_all(str_remove_all(NestID, "\\|"),
+                                       "\\b[Rr]\\w{3,4}\\b")) %>%
+    unnest_longer(parent) %>%
+    mutate(parent = toupper(parent), rings_comb = case_when(
+      parent == "RROB" & season == "2021" ~ "RROB_female",
+      parent == "RROB" ~ "RROB_male",
+      parent == "RROW" & season == "2021" ~ "RROW_female",
+      parent == "RROW" & season == "2022" ~ "RROW_male",
+      TRUE ~ parent)) %>% distinct(rings_comb, season, nest_id)
+}))
+linked_bird_seasons <- dat_breeding_mod %>%
+  distinct(rings_comb, sex, season) %>% mutate(season = as.character(season))
+breeding_attempts <- nest_parent_records %>%
+  inner_join(linked_bird_seasons, by = c("rings_comb", "season")) %>%
+  count(rings_comb, sex, season, name = "n_attempts")
+stopifnot(nrow(breeding_attempts) == 132L,
+          nrow(anti_join(linked_bird_seasons, breeding_attempts,
+                        by = c("rings_comb", "season"))) == 0L)
+breeding_attempts %>% group_by(sex) %>%
+  summarise(`Bird-seasons` = n(), `Median attempts` = median(n_attempts),
+            Minimum = min(n_attempts), Maximum = max(n_attempts),
+            .groups = "drop") %>% knitr::kable()
 ```
 
-```{r, echo=FALSE, eval=FALSE}
-saveRDS(
-  list(fitted_model = fit_mod_sex_first_breed_only, data = dat_breeding_mod),
-  file = here("out/sex_first_breed_only_mod_.rds")
-)
-
-saveRDS(
-  list(fitted_model = fit_mod_sex_last_breed_only, data = dat_breeding_mod),
-  file = here("out/sex_last_breed_only_mod_.rds")
-)
-
-saveRDS(
-  list(fitted_model = fit_mod_sex_last_nest_first_obs_only, data = dat_breeding_mod),
-  file = here("out/sex_last_nest_first_obs_only_mod_.rds")
-)
-```
+These counts describe recorded attempts. They do not establish that every nesting attempt was detected.
 
 ### Analysis: Age Class model
-We next incorporated age class (first-year versus after-first-year) to the sex-specific model to test on a subser of known aged birds whether individuals in the first molt cycle differ from after-first-year birds in baseline plumage and molt timing.
+We added age class to the sex-specific model to compare first-year and after-first-year birds. The sample includes birds assigned an age class from hatch histories or encounters in earlier breeding seasons. Exact age was not known for every AFY bird.
 
 #### dataset
 ```{r}
@@ -1104,9 +1088,11 @@ saveRDS(list(fitted_model = fit_mod_sex_migratory_status,
 ```
 
 ## Results
-Using 1,646 scored photographs from 100 birds across three seasons, we found that 1) baseline rufous band score showed clear persistent differences among birds, whereas evidence for cross-year repeatability in molt timing was weak, 2) age-class differences were evident in molt timing but not in baseline score, and 3) the single-predictor breeding-phenology models showed clear positive associations between later last nest initiation, later last breeding date, and molt midpoint, while first breeding date showed little evidence of an association. Migratory strategy did not clearly shift the molt schedule. The results below start from the saved model objects in `out/`, so this section can be rerun without refitting the time-consuming Bayesian models above. Helper chunks are hidden in the HTML to keep the shared document readable, while the visible chunks show only the short code needed to reproduce the reported tables.
 
-```{r results-helpers, include=FALSE}
+Baseline ornament expression was more repeatable across seasons than molt midpoint. First-year birds reached midpoint earlier than AFY birds, while sex and migratory status showed no clear midpoint differences. The AFY breeding–molt models found positive associations with late breeding dates among birds, but no clear corresponding associations within the same individuals. The following tables summarize the saved posterior draws. The code for extracting coefficients, converting units and calculating contrasts is available beside each result.
+
+```{r results-helpers, echo=TRUE, results="hide"}
+#| code-summary: "Show posterior summaries, date conversions and table functions"
 # Summarise posterior draws as a median and 95% credible interval.
 summarise_posterior <- function(x) {
   tibble(
@@ -1196,79 +1182,6 @@ weighted_date_scaling <- function(data, date_col = "date_J") {
   )
 }
 
-# Summarise breeding-phenology effects using directional contrasts:
-# advances for first breeding date and delays for later breeding dates.
-breeding_predictor_specs <- tibble(
-  predictor = c(
-    "first_breeding_date_J_snum",
-    "last_nest_first_obs_J_snum",
-    "last_breeding_date_J_snum"
-  ),
-  display_label = c(
-    "First breeding date",
-    "Last nest initiation date",
-    "Last breeding date"
-  ),
-  row_label = c(
-    "Δ pre-basic moult midpoint (t0; days) per 1-day advance in first breeding date",
-    "Δ pre-basic moult midpoint (t0; days) per 1-day delay in last nest initiation date",
-    "Δ pre-basic moult midpoint (t0; days) per 1-day delay in last breeding date"
-  ),
-  multiplier = c(-1, 1, 1)
-)
-
-extract_breeding_effect_draws <- function(model_obj, predictor) {
-  breed_post <- as_draws_df(model_obj$fitted_model)
-  date_scale <- weighted_date_scaling(model_obj$data)
-  predictor_spec <- breeding_predictor_specs %>%
-    filter(.data$predictor == .env$predictor)
-
-  if (nrow(predictor_spec) != 1) {
-    stop("Unknown breeding predictor: ", predictor)
-  }
-
-  effect_col <- paste0("b_t0_", predictor)
-
-  if (!effect_col %in% names(breed_post)) {
-    stop("Predictor ", predictor, " not found in fitted model.")
-  }
-
-  breed_post[[effect_col]] * date_scale$weighted_sd * predictor_spec$multiplier[[1]]
-}
-
-summarise_breeding_effect <- function(model_obj, predictor) {
-  predictor_spec <- breeding_predictor_specs %>%
-    filter(.data$predictor == .env$predictor)
-
-  summary_row(
-    predictor_spec$row_label[[1]],
-    "Posterior estimates (state-specific means)",
-    "Breeding phenology",
-    extract_breeding_effect_draws(model_obj, predictor)
-  ) %>%
-    mutate(
-      predictor = predictor_spec$predictor[[1]],
-      predictor_label = predictor_spec$display_label[[1]]
-    )
-}
-
-summarise_breeding_effects <- function(model_obj) {
-  bind_rows(lapply(
-    breeding_predictor_specs$predictor,
-    function(predictor_i) summarise_breeding_effect(model_obj, predictor_i)
-  ))
-}
-
-summarise_single_breeding_effects <- function(single_model_list) {
-  bind_rows(lapply(
-    seq_len(nrow(breeding_predictor_specs)),
-    function(i) {
-      predictor_i <- breeding_predictor_specs$predictor[[i]]
-      summarise_breeding_effect(single_model_list[[predictor_i]], predictor_i)
-    }
-  ))
-}
-
 find_posterior_draw_col <- function(post, patterns, description) {
   col_name <- names(post)[Reduce(`&`, lapply(patterns, grepl, x = names(post)))]
 
@@ -1305,179 +1218,8 @@ find_posterior_draw_col_by_terms <- function(post, include_terms, description,
   col_name
 }
 
-summarise_parental_state_last_breeding_effect <- function(model_obj) {
-  post <- as_draws_df(model_obj$fitted_model)
-  date_scale <- weighted_date_scaling(model_obj$data)
-  last_breeding_col <- "b_t0_last_breeding_date_J_snum"
-  parental_state_col <- "b_t0_parental_statebrood"
-  interaction_col <- find_posterior_draw_col(
-    post,
-    c("^b_t0_", "last_breeding_date_J_snum", "parental_statebrood", ":"),
-    "last breeding date by parental state interaction"
-  )
 
-  nest_slope <- post[[last_breeding_col]] * date_scale$weighted_sd
-  brood_slope <- (post[[last_breeding_col]] + post[[interaction_col]]) * date_scale$weighted_sd
-  brood_minus_nest_slope <- post[[interaction_col]] * date_scale$weighted_sd
-  brood_minus_nest_midpoint <- post[[parental_state_col]] * date_scale$weighted_sd
 
-  bind_rows(
-    summary_row(
-      "Δ pre-basic moult midpoint (t0; days) per 1-day delay in last breeding date, incubation/nest",
-      "Posterior estimates (state-specific means)",
-      "Breeding phenology by parental state",
-      nest_slope
-    ),
-    summary_row(
-      "Δ pre-basic moult midpoint (t0; days) per 1-day delay in last breeding date, brood care",
-      "Posterior estimates (state-specific means)",
-      "Breeding phenology by parental state",
-      brood_slope
-    ),
-    summary_row(
-      "Difference in last-breeding-date effect (brood care − incubation/nest; days per day)",
-      "Posterior contrasts",
-      "Breeding phenology by parental state",
-      brood_minus_nest_slope
-    ),
-    summary_row(
-      "Parental-state effect at mean last breeding date (brood care − incubation/nest; days)",
-      "Posterior contrasts",
-      "Breeding phenology by parental state",
-      brood_minus_nest_midpoint
-    )
-  )
-}
-
-summarise_sex_parental_state_last_breeding_effect <- function(model_obj) {
-  post <- as_draws_df(model_obj$fitted_model)
-  date_scale <- weighted_date_scaling(model_obj$data)
-  last_breeding_col <- "b_t0_last_breeding_date_J_snum"
-  last_breeding_state_col <- find_posterior_draw_col_by_terms(
-    post,
-    include_terms = c("last_breeding_date_J_snum", "parental_statebrood"),
-    exclude_terms = "sexM",
-    description = "last breeding date by parental state interaction"
-  )
-  last_breeding_sex_col <- find_posterior_draw_col_by_terms(
-    post,
-    include_terms = c("last_breeding_date_J_snum", "sexM"),
-    exclude_terms = "parental_statebrood",
-    description = "last breeding date by sex interaction"
-  )
-  last_breeding_state_sex_col <- find_posterior_draw_col_by_terms(
-    post,
-    include_terms = c("last_breeding_date_J_snum", "parental_statebrood", "sexM"),
-    description = "last breeding date by parental state by sex interaction"
-  )
-
-  female_nest_slope <- post[[last_breeding_col]] * date_scale$weighted_sd
-  female_brood_slope <- (
-    post[[last_breeding_col]] +
-      post[[last_breeding_state_col]]
-  ) * date_scale$weighted_sd
-  male_nest_slope <- (
-    post[[last_breeding_col]] +
-      post[[last_breeding_sex_col]]
-  ) * date_scale$weighted_sd
-  male_brood_slope <- (
-    post[[last_breeding_col]] +
-      post[[last_breeding_state_col]] +
-      post[[last_breeding_sex_col]] +
-      post[[last_breeding_state_sex_col]]
-  ) * date_scale$weighted_sd
-
-  female_minus_male_nest <- female_nest_slope - male_nest_slope
-  female_minus_male_brood <- female_brood_slope - male_brood_slope
-  brood_minus_nest_sex_difference <- female_minus_male_brood - female_minus_male_nest
-
-  bind_rows(
-    summary_row(
-      "Female slope: incubation/nest",
-      "Posterior estimates (sex- and state-specific slopes)",
-      "Sex by parental state",
-      female_nest_slope
-    ),
-    summary_row(
-      "Male slope: incubation/nest",
-      "Posterior estimates (sex- and state-specific slopes)",
-      "Sex by parental state",
-      male_nest_slope
-    ),
-    summary_row(
-      "Female slope: brood care",
-      "Posterior estimates (sex- and state-specific slopes)",
-      "Sex by parental state",
-      female_brood_slope
-    ),
-    summary_row(
-      "Male slope: brood care",
-      "Posterior estimates (sex- and state-specific slopes)",
-      "Sex by parental state",
-      male_brood_slope
-    ),
-    summary_row(
-      "Female - male slope difference: incubation/nest",
-      "Posterior contrasts",
-      "Sex by parental state",
-      female_minus_male_nest
-    ),
-    summary_row(
-      "Female - male slope difference: brood care",
-      "Posterior contrasts",
-      "Sex by parental state",
-      female_minus_male_brood
-    ),
-    summary_row(
-      "Change in female - male slope difference: brood care - incubation/nest",
-      "Posterior contrasts",
-      "Sex by parental state",
-      brood_minus_nest_sex_difference
-    )
-  ) %>%
-    mutate(
-      pr_positive = c(
-        mean(female_nest_slope > 0, na.rm = TRUE),
-        mean(male_nest_slope > 0, na.rm = TRUE),
-        mean(female_brood_slope > 0, na.rm = TRUE),
-        mean(male_brood_slope > 0, na.rm = TRUE),
-        mean(female_minus_male_nest > 0, na.rm = TRUE),
-        mean(female_minus_male_brood > 0, na.rm = TRUE),
-        mean(brood_minus_nest_sex_difference > 0, na.rm = TRUE)
-      )
-    )
-}
-
-previous_single_breeding_effect_summary <- function() {
-  stats <- tibble(
-    predictor = c(
-      "first_breeding_date_J_snum",
-      "last_nest_first_obs_J_snum",
-      "last_breeding_date_J_snum"
-    ),
-    estimate = c(0.01, 0.21, 0.17),
-    ci_lower = c(-0.16, 0.05, 0.04),
-    ci_upper = c(0.18, 0.37, 0.31)
-  )
-
-  breeding_predictor_specs %>%
-    left_join(stats, by = "predictor") %>%
-    mutate(
-      type = "Posterior estimates (state-specific means)",
-      parameter_ = "Breeding phenology",
-      parameter = row_label,
-      median_CI = format_numeric_interval(
-        tibble(
-          median = estimate,
-          ci_lower = ci_lower,
-          ci_upper = ci_upper
-        )
-      ),
-      predictor_label = display_label
-    ) %>%
-    select(type, parameter_, parameter, estimate, ci_lower, ci_upper,
-           median_CI, predictor, predictor_label)
-}
 
 # Convert `performance::r2_bayes()` output into the same table-ready format used elsewhere.
 summarise_bayes_r2 <- function(fitted_model) {
@@ -1502,21 +1244,15 @@ add_repeatability_draws <- function(post) {
       var_t0_rings_comb_season =
         `sd_rings_comb:season__t0_Intercept`^2,
       var_baseline_total =
-        var_baseline_rings_comb + var_baseline_rings_comb_season + sigma^2,
+        var_baseline_rings_comb + var_baseline_rings_comb_season,
       var_t0_total =
-        var_t0_rings_comb + var_t0_rings_comb_season + sigma^2,
-      # Across-year repeatability is the correlation between repeated measures
-      # from the same bird in different seasons, so only the bird-level effect
-      # contributes to the shared variance.
+        var_t0_rings_comb + var_t0_rings_comb_season,
+      # Parameter-level repeatability uses each latent parameter's own
+      # bird and bird-season variances. Score residual variance belongs to
+      # the observation model and must not be added to date variance.
       R_baseline_between_year = var_baseline_rings_comb / var_baseline_total,
       R_t0_between_year = var_t0_rings_comb / var_t0_total,
-      # Within-year repeatability is the correlation between repeated measures
-      # from the same bird in the same season, so both bird- and bird-season-
-      # level effects contribute to the shared variance.
-      R_baseline_within_year =
-        (var_baseline_rings_comb + var_baseline_rings_comb_season) / var_baseline_total,
-      R_t0_within_year =
-        (var_t0_rings_comb + var_t0_rings_comb_season) / var_t0_total,
+      R_baseline_minus_t0 = R_baseline_between_year - R_t0_between_year,
       cor_baseline_t0 = cor_rings_comb__baseline_Intercept__t0_Intercept,
       resid_var = sigma^2
     )
@@ -1661,12 +1397,15 @@ model_diagnostics_table <- function(model_list) {
       "ess_tail"
     )
 
+    sampler <- brms::nuts_params(model_obj$fitted_model)
     tibble(
       model = model_name,
       max_rhat = round(max(draw_summary$rhat, na.rm = TRUE), 3),
       n_rhat_over_1_01 = sum(draw_summary$rhat > 1.01, na.rm = TRUE),
       min_bulk_ess = floor(min(draw_summary$ess_bulk, na.rm = TRUE)),
-      min_tail_ess = floor(min(draw_summary$ess_tail, na.rm = TRUE))
+      min_tail_ess = floor(min(draw_summary$ess_tail, na.rm = TRUE)),
+      n_divergent = sum(sampler$Value[sampler$Parameter == "divergent__"]),
+      tree_depth_limit_hits = sum(sampler$Value[sampler$Parameter == "treedepth__"] >= 15)
     )
   })
 }
@@ -1719,16 +1458,14 @@ display_consolidated_table <- function(tbl) {
 
   n_lookup <- c(
     "Sex-specific" = count_model_individuals("sex_mod", 100L),
-    "Breeding phenology" = count_model_individuals("sex_last_breed_only_mod", 81L),
-    "Age-class" = count_model_individuals("sex_age_class_mod", 86L),
+    "Age-class" = count_model_individuals("sex_age_class_mod", 83L),
     "Migratory status" = count_model_individuals("sex_migratory_status_mod", 41L)
   )
 
   section_levels <- c(
     "Fixed effects on baseline breeding plumage score (β)",
     "Fixed effects on post-breeding molt midpoint (t0): season, sex, age-class, and migration strategy",
-    "Fixed effects on post-breeding molt midpoint (t0): effect of 1-day change in breeding phenology trait",
-    "Derived fixed effects: post-breeding molt rate at t0",
+    "Derived days per score at midpoint",
     "Repeatability of molt traits (R)",
     "Model fit",
     "Variance components and residual structure"
@@ -1737,18 +1474,13 @@ display_consolidated_table <- function(tbl) {
   display_tbl <- tbl %>%
     mutate(
       section = case_when(
-        grepl(
-          "first breeding date|last nest initiation date|last breeding date",
-          parameter,
-          ignore.case = TRUE
-        ) ~
-          "Fixed effects on post-breeding molt midpoint (t0): effect of 1-day change in breeding phenology trait",
-        grepl("rate at inflection", parameter, ignore.case = TRUE) ~
-          "Derived fixed effects: post-breeding molt rate at t0",
+        grepl("days per score at midpoint", parameter, ignore.case = TRUE) ~
+          "Derived days per score at midpoint",
         type == "Repeatability" ~ "Repeatability of molt traits (R)",
         type == "Model-level goodness-of-fit" ~ "Model fit",
         type %in% c(
           "Between-individual variance (random effects)",
+          "Bird-season variance (random effects)",
           "Random-effects correlation",
           "Residual (within-observation) variance"
         ) ~ "Variance components and residual structure",
@@ -1770,7 +1502,8 @@ display_consolidated_table <- function(tbl) {
         grepl("^Pre-basic moult midpoint \\(t0\\), season", parameter) ~
           paste0(
             "Season ",
-            stringr::str_extract(parameter, "\\d{4}"),
+            paste0(stringr::str_extract(parameter, "\\d{4}"), "–",
+                   as.integer(stringr::str_extract(parameter, "\\d{4}")) + 1L),
             " midpoint, females (reference; date)"
           ),
         grepl("^Pre-basic moult midpoint.*females", parameter) ~
@@ -1778,7 +1511,9 @@ display_consolidated_table <- function(tbl) {
         grepl("^Season effect on pre-basic moult midpoint", parameter) ~
           paste0(
             "Season effect (",
-            stringr::str_match(parameter, "t0\\): (.*)$")[, 2],
+            stringr::str_replace_all(
+              stringr::str_match(parameter, "t0\\): (.*)$")[, 2],
+              "202[123]", function(year) paste0(year, "–", as.integer(year) + 1L)),
             "; Δ days)"
           ),
         grepl("^Sex effect on pre-basic moult mid", parameter) ~
@@ -1787,15 +1522,9 @@ display_consolidated_table <- function(tbl) {
           "Age-class effect (AFY – FY; Δ days)",
         grepl("^Migratory-strategy effect on pre-basic moult midpoint", parameter) ~
           "Migratory-strategy effect (Resident – Migrant; Δ days)",
-        grepl("first breeding date", parameter, ignore.case = TRUE) ~
-          "First date observed breeding (Δ days per 1-day advance)",
-        grepl("last nest initiation date", parameter, ignore.case = TRUE) ~
-          "Last nest initiation date (Δ days per 1-day delay)",
-        grepl("last breeding date", parameter, ignore.case = TRUE) ~
-          "Last date observed breeding (Δ days per 1-day delay)",
-        grepl("^Pre-basic moult rate at inflection.*females", parameter) ~
+        grepl("^Derived days per score at midpoint.*females", parameter) ~
           "Intercept, females (reference; days·score⁻¹)",
-        grepl("^Sex effect on pre-basic moult rate at inflection", parameter) ~
+        grepl("^Sex contrast in derived days per score at midpoint", parameter) ~
           "Sex effect (males – females; days·score⁻¹)",
         parameter == "Between-year repeatability of alternate plumage" ~
           "Between-year repeatability of β",
@@ -1809,6 +1538,10 @@ display_consolidated_table <- function(tbl) {
           "Between-individual variance in β",
         parameter == "Between-individual variance in pre-basic moult midpoint date" ~
           "Between-individual variance in t0",
+        parameter == "Bird-season variance in baseline plumage score" ~
+          "Bird-season variance in β",
+        parameter == "Bird-season variance in pre-basic moult midpoint date" ~
+          "Bird-season variance in t0",
         grepl("^Correlation between baseline alternate plumage score", parameter) ~
           "Correlation between β and t0",
         TRUE ~ parameter
@@ -1816,12 +1549,6 @@ display_consolidated_table <- function(tbl) {
       model = case_when(
         grepl("^Age-class effect", parameter) ~ "Age-class",
         grepl("^Migratory-strategy effect", parameter) ~ "Migratory status",
-        grepl(
-          "first breeding date|last nest initiation date|last breeding date",
-          parameter,
-          ignore.case = TRUE
-        ) ~
-          "Breeding phenology",
         TRUE ~ "Sex-specific"
       ),
       n_ind = as.integer(unname(n_lookup[model])),
@@ -1883,31 +1610,11 @@ display_consolidated_table <- function(tbl) {
 }
 ```
 
-```{r results-load-models, echo=FALSE}
+```{r results-load-models, echo=TRUE}
 # Load each saved model once so the visible chunks can stay short and readable.
 sex_mod <- readRDS(here("out/sex_mod_.rds"))
 sex_age_class_mod <- readRDS(here("out/sex_age_class_mod_2.rds"))
 sex_migratory_status_mod <- readRDS(here("out/sex_migratory_status_mod_.rds"))
-
-single_breeding_model_paths <- c(
-  first_breeding_date_J_snum = here("out/sex_first_breed_only_mod_.rds"),
-  last_nest_first_obs_J_snum = here("out/sex_last_nest_first_obs_only_mod_.rds"),
-  last_breeding_date_J_snum = here("out/sex_last_breed_only_mod_.rds")
-)
-
-single_breeding_models <- if (all(file.exists(single_breeding_model_paths))) {
-  lapply(single_breeding_model_paths, readRDS)
-} else {
-  # These models were added to the main analysis after the previous render.
-  # Until the new model objects are saved, Table 1 uses the rendered single-model summaries below.
-  NULL
-}
-
-if (!is.null(single_breeding_models)) {
-  sex_first_breed_only_mod <- single_breeding_models[["first_breeding_date_J_snum"]]
-  sex_last_nest_first_obs_only_mod <- single_breeding_models[["last_nest_first_obs_J_snum"]]
-  sex_last_breed_only_mod <- single_breeding_models[["last_breeding_date_J_snum"]]
-}
 
 results_models <- list(
   "Sex + season moult model" = sex_mod,
@@ -1915,20 +1622,10 @@ results_models <- list(
   "Sex + season + migratory-status model" = sex_migratory_status_mod
 )
 
-if (!is.null(single_breeding_models)) {
-  results_models <- c(
-    results_models,
-    list(
-      "Sex + season + first breeding date model" = sex_first_breed_only_mod,
-      "Sex + season + last nest initiation date model" = sex_last_nest_first_obs_only_mod,
-      "Sex + season + last breeding date model" = sex_last_breed_only_mod
-    )
-  )
-}
 ```
 
 #### Diagnostics
-Report compact convergence summaries for each fitted model rather than printing full `brms` output
+We checked convergence using R-hat, effective sample sizes and sampler diagnostics. The tables summarize the saved fits.
 ```{r results-diagnostics, echo=FALSE}
 diagnostics_table <- model_diagnostics_table(results_models)
 
@@ -1939,14 +1636,16 @@ diagnostics_table %>%
     max_rhat = "Max R-hat",
     n_rhat_over_1_01 = "Parameters with R-hat > 1.01",
     min_bulk_ess = "Min bulk ESS",
-    min_tail_ess = "Min tail ESS"
+    min_tail_ess = "Min tail ESS",
+    n_divergent = "Divergent transitions",
+    tree_depth_limit_hits = "Tree-depth-limit hits"
   )
 ```
 
 ### Results: Sex-specific model
-We use the sex model as the main reference because it uses the full dataset. It shows clear sex differences in baseline ornament expression, clear season-to-season shifts in molt midpoint, little evidence for a sex difference in midpoint, and strong repeatability in baseline ornament expression but limited between-year repeatability in timing.
+We use the sex model as the main reference because it uses the full dataset. It shows clear sex differences in baseline ornament expression, clear season-to-season shifts in molt midpoint, no clear sex difference in midpoint, and strong repeatability in baseline ornament expression but limited between-year repeatability in timing.
 
-```{r results-sex-model, echo=FALSE}
+```{r results-sex-model, echo=TRUE}
 # Start from the saved posterior draws so this chunk reproduces the reported table without refitting.
 sex_post <- as_draws_df(sex_mod$fitted_model)
 
@@ -2014,15 +1713,15 @@ sex_mod_summary_table <- bind_rows(
   ),
   sex_t0_rows,
   summary_row(
-    "Pre-basic moult rate at inflection (days·score⁻¹), females (reference)",
+    "Derived days per score at midpoint (days·score⁻¹), females (reference)",
     "Posterior estimates (state-specific means)",
-    "Moult rate (days·score⁻¹, k)",
+    "Derived days per score (shared k)",
     sex_post$rate_days_score_sexF
   ),
   summary_row(
-    "Sex effect on pre-basic moult rate at inflection (days·score⁻¹): males − females",
+    "Sex contrast in derived days per score at midpoint (days·score⁻¹): males − females",
     "Posterior estimates (state-specific means)",
-    "Moult rate (days·score⁻¹, k)",
+    "Derived days per score (shared k)",
     sex_post$rate_days_score_diff
   ),
   summary_row(
@@ -2036,6 +1735,10 @@ sex_mod_summary_table <- bind_rows(
     "Repeatability",
     "",
     sex_post$R_t0_between_year
+  ),
+  summary_row(
+    "Baseline minus midpoint repeatability",
+    "Repeatability", "", sex_post$R_baseline_minus_t0
   ),
   summary_row_from_stats(
     "Marginal R²",
@@ -2062,6 +1765,16 @@ sex_mod_summary_table <- bind_rows(
     sex_post$var_t0_rings_comb
   ),
   summary_row(
+    "Bird-season variance in baseline plumage score",
+    "Bird-season variance (random effects)", "",
+    sex_post$var_baseline_rings_comb_season
+  ),
+  summary_row(
+    "Bird-season variance in pre-basic moult midpoint date",
+    "Bird-season variance (random effects)", "",
+    sex_post$var_t0_rings_comb_season
+  ),
+  summary_row(
     "Correlation between baseline alternate plumage score and pre-basic moult midpoint date",
     "Random-effects correlation",
     "",
@@ -2078,23 +1791,13 @@ sex_mod_summary_table <- bind_rows(
 display_result_table(sex_mod_summary_table)
 ```
 
-### Results: Breeding Phenology model
-When entered singly, later last nest initiation and later last breeding date showed positive associations with the post-breeding molt midpoint. In contrast, the single-predictor model for first breeding date showed little evidence for a shift in molt timing.
 
-```{r results-breeding-phenology-model, echo=FALSE}
-single_breeding_effect_summary_table <- if (!is.null(single_breeding_models)) {
-  summarise_single_breeding_effects(single_breeding_models)
-} else {
-  previous_single_breeding_effect_summary()
-}
-
-display_result_table(single_breeding_effect_summary_table)
-```
+Adjusted repeatability describes the persistence of individual differences in baseline and midpoint after controlling for each parameter's fixed effects. The ratios use bird variance divided by bird plus bird-season variance. Photographic-score residual variance is excluded. These estimates do not directly measure responses to changes in breeding phenology or reproductive state.
 
 ### Results: Age Class model
-The age-class model showed a clear contrast between first-year and after-first-year birds, driven mainly by later molt midpoints in older birds. There was little evidence for an accompanying difference in baseline plumage score.
+The age-class model showed a clear contrast between first-year and after-first-year birds, driven mainly by later molt midpoints in older birds. There was no clear difference between age classes in baseline plumage score.
 
-```{r results-age-class-model, echo=FALSE}
+```{r results-age-class-model, echo=TRUE}
 age_class_post <- as_draws_df(sex_age_class_mod$fitted_model)
 
 # Convert the age-class t0 effect from scaled units back to days.
@@ -2120,9 +1823,9 @@ display_result_table(sex_age_class_mod_summary_table)
 ```
 
 ### Results: Migratory Strategy model
-Residents and migrants showed similar baseline plumage scores and molt timing, with broad overlap in both traits.
+We found no clear difference between residents and migrants in baseline expression or molt midpoint. The broad credible intervals do not establish equivalent schedules.
 
-```{r results-migratory-model, echo=FALSE}
+```{r results-migratory-model, echo=TRUE}
 # The consolidated table only reports the migratory-status contrasts, so keep this chunk to those rows.
 migratory_post <- as_draws_df(sex_migratory_status_mod$fitted_model)
 
@@ -2148,10 +1851,10 @@ sex_migratory_status_mod_summary_table <- bind_rows(
 display_result_table(sex_migratory_status_mod_summary_table)
 ```
 
-### Table 1
-Consolidated table of results
+### Table 1 {#table-1}
+State-specific, season and repeatability results. Values are posterior medians and 95% credible intervals. Variance components remain on the fitted parameter scales. Derived days per score depend on baseline and the shared $k$ and do not test state-specific variation in steepness.
 
-```{r results-consolidated-table, echo=FALSE}
+```{r results-consolidated-table, echo=TRUE}
 # Assemble the final table in the same reporting order used in the manuscript text.
 sex_baseline_parameters <- c(
   "Baseline alternate plumage score (β), females (reference)",
@@ -2164,14 +1867,17 @@ sex_t0_parameters <- c(
 )
 
 sex_remaining_parameters <- c(
-  "Pre-basic moult rate at inflection (days·score⁻¹), females (reference)",
-  "Sex effect on pre-basic moult rate at inflection (days·score⁻¹): males − females",
+  "Derived days per score at midpoint (days·score⁻¹), females (reference)",
+  "Sex contrast in derived days per score at midpoint (days·score⁻¹): males − females",
   "Between-year repeatability of alternate plumage",
   "Between-year repeatability of pre-basic moult mid-point date",
+  "Baseline minus midpoint repeatability",
   "Marginal R²",
   "Conditional R²",
   "Between-individual variance in baseline plumage score",
   "Between-individual variance in pre-basic moult midpoint date",
+  "Bird-season variance in baseline plumage score",
+  "Bird-season variance in pre-basic moult midpoint date",
   "Correlation between baseline alternate plumage score and pre-basic moult midpoint date",
   "Residual variance"
 )
@@ -2183,7 +1889,6 @@ grand_summary_table <- bind_rows(
   pick_parameter_rows(sex_mod_summary_table, sex_t0_parameters),
   sex_age_class_mod_summary_table %>% slice(2),
   sex_migratory_status_mod_summary_table %>% slice(2),
-  single_breeding_effect_summary_table,
   pick_parameter_rows(sex_mod_summary_table, sex_remaining_parameters)
 )
 
@@ -2208,16 +1913,157 @@ write_xlsx(
 )
 ```
 
+### Results: Breeding schedules and molt midpoint {#afy-breeding-models}
+
+The three main breeding–molt models are restricted to confidently after-first-year (AFY)
+bird-seasons. They contain 1,045 scored observations from 47 after-first-year birds across
+86 bird-seasons. Twenty-eight birds contributed repeated seasons, including
+17 with two and 11 with three. We calculated each bird's mean breeding date
+and seasonal deviation from one record per retained bird-season after the
+AFY restriction. The breeding dates retain their original centering within
+season. Both components predict molt midpoint, while baseline retains sex
+and random effects. The models use the same priors, shared transition
+steepness and four chains of 10,000 iterations (5,000 warmup) as the main
+models. They estimate a common within-individual slope, not individual
+reaction-norm slopes. Single-season birds have a zero within-individual
+deviation and contribute to the among-individual comparison.
+
+#### R implementation of equations (6) and (7)
+
+The common complete-case sample requires all three breeding-date predictors. Each predictor is then fitted separately. The code below follows the existing fitting script and retains its data filtering, factor levels, priors and random effects.
+
+```{r afy-data-construction}
+predictors <- c("first_breeding_date_J_snum", "last_nest_first_obs_J_snum",
+                "last_breeding_date_J_snum")
+dat_afy <- dat_breeding %>%
+  filter(age_class == "AFY") %>%
+  select(score, date_J, rings_comb, sex, season, age_class, age_class_source,
+         all_of(predictors)) %>% distinct() %>%
+  add_reference_date_scaling() %>%
+  drop_na(score, date_J, sex, rings_comb, season, all_of(predictors)) %>%
+  mutate(across(c(rings_comb, sex, season, age_class, age_class_source),
+                ~ if (is.factor(.x)) droplevels(.x) else factor(.x))) %>%
+  as.data.frame()
+bird_seasons <- distinct(dat_afy, rings_comb, season)
+
+build_afy_dataset <- function(predictor) {
+  phenology <- dat_afy %>%
+    select(rings_comb, season, all_of(predictor)) %>% distinct()
+  stopifnot(nrow(phenology) == nrow(bird_seasons))
+  phenology <- phenology %>% group_by(rings_comb) %>%
+    mutate(n_phenology_seasons = n(),
+           breeding_mean_i = mean(.data[[predictor]]),
+           breeding_dev_is = .data[[predictor]] - breeding_mean_i) %>% ungroup()
+  checks <- phenology %>% group_by(rings_comb) %>%
+    summarise(mean_deviation = mean(breeding_dev_is), .groups = "drop")
+  stopifnot(max(abs(checks$mean_deviation)) < 1e-10)
+  dat_afy %>% left_join(phenology, by = c("rings_comb", "season", predictor)) %>%
+    as.data.frame()
+}
+
+afy_formula <- bf(
+  score ~ 1 + (baseline - 1) * (1 - 1 / (1 + exp(-k * (date_J_scaled - t0)))),
+  baseline ~ sex + (1 | i | rings_comb) + (1 | rings_comb:season),
+  t0 ~ sex + season + breeding_mean_i + breeding_dev_is +
+    (1 | i | rings_comb) + (1 | rings_comb:season),
+  k ~ 1, nl = TRUE
+)
+```
+
+```{r afy-optional-fit, eval=FALSE}
+# Fit each predictor separately with the same priors defined above.
+# Use seeds 261, 262 and 263 for first date, last nest and last date, respectively.
+dat_afy_last <- build_afy_dataset("last_breeding_date_J_snum")
+fit_afy_last <- brm(
+  formula = afy_formula, data = dat_afy_last,
+  family = gaussian(), prior = moult_priors,
+  chains = 4, cores = 4, iter = 10000, warmup = 5000,
+  backend = "cmdstanr", seed = 263,
+  control = list(adapt_delta = 0.999, max_treedepth = 15)
+)
+# The existing script fits all three predictors and saves the reporting scale,
+# model data and session information alongside each completed fit.
+# Run it manually only when a full refit is intended:
+# source(here("scripts/run_afy_within_individual_breeding_phenology_models.R"))
+```
+
+```{r afy-results-load-and-summarise, echo=TRUE, results="hide"}
+afy_specs <- tibble::tribble(
+  ~label, ~path,
+  "First observed breeding date", "sex_first_breed_within_individual_afy_mod_.rds",
+  "Last nest date", "sex_last_nest_within_individual_afy_mod_.rds",
+  "Last observed breeding date", "sex_last_breed_within_individual_afy_mod_.rds"
+)
+afy_models <- setNames(lapply(afy_specs$path, function(x) readRDS(here("out", x))),
+                       afy_specs$label)
+afy_summary <- bind_rows(lapply(names(afy_models), function(label_i) {
+  model_i <- afy_models[[label_i]]
+  stopifnot(nrow(model_i$data) == 1045,
+            n_distinct(model_i$data$rings_comb) == 47,
+            nrow(distinct(model_i$data, rings_comb, season)) == 86,
+            all(model_i$data$age_class == "AFY"))
+  rebuilt_i <- build_afy_dataset(model_i$predictor)
+  stopifnot(isTRUE(all.equal(model_i$data, rebuilt_i)))
+  draws_i <- as_draws_df(model_i$fitted_model)
+  sd_days_i <- model_i$midpoint_days_conversion
+  among_i <- draws_i$b_t0_breeding_mean_i * sd_days_i
+  within_i <- draws_i$b_t0_breeding_dev_is * sd_days_i
+  bind_rows(lapply(c("Among individuals", "Within individuals", "Among minus within"),
+    function(component_i) {
+      values_i <- switch(component_i,
+                         "Among individuals" = among_i,
+                         "Within individuals" = within_i,
+                         "Among minus within" = among_i - within_i)
+      summarise_posterior(values_i) %>%
+        mutate(predictor = label_i, component = component_i)
+    }))
+}))
+write.csv(afy_summary, here("out", "revision3_afy_table2.csv"), row.names = FALSE)
+```
+
+**Table 2.** Among- and within-individual associations between breeding schedules and molt midpoint in after-first-year birds.
+Values are days of midpoint delay per one-day breeding-date delay.
+Among minus within is calculated from paired posterior draws and directly
+compares the two slopes. The last nest date combines estimated laying dates
+and first observations, as defined in the manuscript Methods.
+
+```{r afy-table2, echo=TRUE}
+afy_table2 <- afy_summary %>%
+  mutate(value = format_numeric_interval(select(., median, ci_lower, ci_upper))) %>%
+  select(`Breeding date` = predictor, component, value) %>%
+  pivot_wider(names_from = component, values_from = value) %>%
+  arrange(match(`Breeding date`, afy_specs$label))
+knitr::kable(afy_table2)
+```
+
+For last observed breeding date, the among-individual estimate is positive,
+but there is no clear within-individual association. The same pattern occurs
+for last nest date. The direct among-minus-within contrast excludes zero
+for last nest date, but not for last observed breeding date. Neither
+component is clearly associated with first observed breeding date. These
+results do not demonstrate an absence of individual plasticity.
+
+```{r afy-diagnostics, echo=FALSE}
+afy_diagnostics <- model_diagnostics_table(afy_models)
+afy_diagnostics$n_divergent <- vapply(afy_models, function(model_i) {
+  np <- brms::nuts_params(model_i$fitted_model)
+  sum(np$Value[np$Parameter == "divergent__"])
+}, numeric(1))
+afy_diagnostics %>% knitr::kable()
+write.csv(afy_diagnostics, here("out", "revision3_afy_diagnostics.csv"), row.names = FALSE)
+```
+
+
 ## Figures
-The manuscript's Figure 1 is reproduced as two adjacent components in this
+The manuscript's Figure 1 is reproduced as two components in this
 document: the static photo montage and scoring panel above (`Figure 1a`) and
 the code-generated overview panel below (`Figure 1b`).
 
-### Figure 1b - raw data overview
+### Figure 1b — raw data overview {#figure-1b}
 
 ```{r}
 #| code-fold: true
-#| code-summary: "Show code for figure 2"
+#| code-summary: "Show code for Figure 1b"
 breeding_data_all <- readRDS(here("data/breeding_KK_data.rds"))
 
 #### breeding histograms
@@ -2520,14 +2366,14 @@ ggsave(fig2,
        width = 5, height = 5)
 ```
 
-### Figure 3 - state-dependent molt trajectories
+### Figure 3 — state-specific molt trajectories {#figure-3}
 This figure reproduces the manuscript's state-dependent summary of the sex,
 age-class, and migratory-strategy models. The left column shows population-level
 predicted molt trajectories, while the middle and right columns show the
 state-specific posteriors for molt midpoint (`t0`) and the baseline rufous-band
 score (`β`).
 
-```{r}
+```{r figure3-display, fig.width=10, fig.height=5.8, out.width="100%"}
 #| code-fold: true
 #| code-summary: "Show code for Figure 3"
 #| fig-width: 8
@@ -3213,6 +3059,7 @@ bottom_row <-
 #   plot_layout(heights = c(0.8, 1.2))
 #
 # combined_plot
+bottom_row
 ```
 
 ```{r, echo=FALSE, include=FALSE}
@@ -3226,1252 +3073,536 @@ ggsave(
 )
 ```
 
-### Figure 4 - breeding phenology effects
-This figure reproduces the manuscript's breeding-phenology summary as three
-single-predictor effect plots. The upper strip in each panel shows the observed
-distribution of the phenology predictor, and the lower panel shows the
-model-implied shift in molt midpoint. Because $t_0$ is a latent model parameter
-rather than a directly observed point for each bird-season, this is preferable
-to a raw scatterplot. Positive x-values denote the Table 1 direction: earlier
-first breeding date, later last nest initiation date, and later last breeding
-date.
 
-```{r figure-5-breeding-phenology-effects, echo=FALSE, fig.width=8.5, fig.height=5}
-#| code-fold: true
-#| code-summary: "Show code for Figure 4"
-breeding_effect_plot_data <- bind_rows(lapply(
-  seq_len(nrow(breeding_predictor_specs)),
-  function(i) {
-    spec_i <- breeding_predictor_specs[i, ]
-    stats_i <- single_breeding_effect_summary_table %>%
-      filter(predictor == spec_i$predictor)
-    x_seq <- seq(
-      min(dat_breeding_mod[[spec_i$predictor]], na.rm = TRUE),
-      max(dat_breeding_mod[[spec_i$predictor]], na.rm = TRUE),
-      length.out = 100
-    ) * spec_i$multiplier
+**Figure 3.** State-specific molt trajectories. (a) Predicted post-breeding molt schedules from the sex, age-class and migratory-status models. Ribbons show 95% credible intervals for population trajectories, and faint lines show selected posterior draws for individual bird-seasons. Gray shading denotes the nest-observation period. The posterior distributions describe (b) molt midpoint and (c) baseline expression. Age-class and migration midpoint distributions use females as the reference sex. Panel (c) shows baseline distributions separately for females and males. White symbols indicate posterior medians, and black bars show 50%, 80% and 95% credible intervals.
 
-    tibble(
-      predictor = spec_i$predictor,
-      predictor_label = spec_i$display_label,
-      phenology_shift = x_seq,
-      estimate = stats_i$estimate,
-      ci_lower = stats_i$ci_lower,
-      ci_upper = stats_i$ci_upper,
-      midpoint_shift = estimate * phenology_shift,
-      midpoint_shift_lower = pmin(ci_lower * phenology_shift, ci_upper * phenology_shift),
-      midpoint_shift_upper = pmax(ci_lower * phenology_shift, ci_upper * phenology_shift)
-    )
-  }
-))
+::: {.callout-note title="Calendar predictions in Figure 3"}
+The existing plotting code uses pooled date-scaling constants and a separate interpolation for the curves. The manuscript caption's intended 2021–2022 reference-season statement will apply after the deferred correction. It does not yet describe the displayed calendar predictions. Numerical results should be taken from the season-specific Table 1 summaries.
+:::
 
-breeding_effect_observed_data <- bind_rows(lapply(
-  seq_len(nrow(breeding_predictor_specs)),
-  function(i) {
-    spec_i <- breeding_predictor_specs[i, ]
+### Figure 4 — AFY breeding–molt associations {#figure-4}
 
-    tibble(
-      predictor = spec_i$predictor,
-      predictor_label = spec_i$display_label,
-      phenology_shift = dat_breeding_mod[[spec_i$predictor]] * spec_i$multiplier
-    )
-  }
-))
-
-breeding_effect_label_levels <- c(
-  "First breeding date",
-  "Last nest initiation date",
-  "Last breeding date"
-)
-
-breeding_effect_plot_data <- breeding_effect_plot_data %>%
-  mutate(predictor_label = factor(predictor_label, levels = breeding_effect_label_levels))
-
-breeding_effect_distribution_data <- breeding_effect_observed_data %>%
-  mutate(predictor_label = factor(predictor_label, levels = breeding_effect_label_levels)) %>%
-  filter(!is.na(phenology_shift))
-
-breeding_effect_x_limits <- range(
-  c(
-    breeding_effect_plot_data$phenology_shift,
-    breeding_effect_distribution_data$phenology_shift
-  ),
-  na.rm = TRUE
-)
-
-breeding_effect_hist_breaks <- pretty(breeding_effect_x_limits, n = 18)
-if (length(breeding_effect_hist_breaks) < 2) {
-  breeding_effect_hist_breaks <- breeding_effect_x_limits + c(-0.5, 0.5)
-}
-
-breeding_effect_distribution_positions <- breeding_effect_distribution_data %>%
-  group_by(predictor_label) %>%
-  summarise(
-    max_count = max(
-      hist(phenology_shift, breaks = breeding_effect_hist_breaks, plot = FALSE)$counts,
-      1,
-      na.rm = TRUE
-    ),
-    .groups = "drop"
-  )
-
-breeding_effect_distribution_y_anchor <- max(
-  breeding_effect_distribution_positions$max_count,
-  1,
-  na.rm = TRUE
-)
-
-breeding_effect_distribution_positions <- breeding_effect_distribution_positions %>%
-  mutate(
-    point_y = breeding_effect_distribution_y_anchor * 1.25,
-    box_y = breeding_effect_distribution_y_anchor * 1.55,
-    y_max = breeding_effect_distribution_y_anchor * 1.8
-  )
-
-breeding_effect_distribution_data <- breeding_effect_distribution_data %>%
-  left_join(breeding_effect_distribution_positions, by = "predictor_label")
-
-breeding_effect_distribution_y_max <- max(
-  breeding_effect_distribution_positions$y_max,
-  na.rm = TRUE
-)
-
-breeding_effect_theme <- theme_minimal(base_family = "sans") +
-  theme(
-    text = element_text(family = "sans"),
-    panel.border = element_blank(),
-    panel.grid.minor = element_blank(),
-    panel.grid.major = element_line(linewidth = 0.25, lineend = "round", colour = "grey90"),
-    axis.ticks = element_blank(),
-    strip.background = element_blank(),
-    strip.text = element_text(size = 10, colour = "grey35"),
-    legend.position = "none"
-  )
-
-breeding_effect_distribution_plot <-
-  ggplot(
-    breeding_effect_distribution_data,
-    aes(x = phenology_shift)
-  ) +
-  geom_histogram(
-    aes(y = after_stat(count)),
-    breaks = breeding_effect_hist_breaks,
-    fill = "grey82",
-    colour = NA,
-    alpha = 0.55
-  ) +
-  geom_point(
-    aes(y = point_y),
-    colour = "grey50",
-    alpha = 0.28,
-    size = 1.1,
-    position = position_jitter(
-      width = 0,
-      height = breeding_effect_distribution_y_max * 0.025,
-      seed = 123
-    )
-  ) +
-  geom_boxplot(
-    aes(y = box_y, group = predictor_label),
-    orientation = "y",
-    width = breeding_effect_distribution_y_max * 0.07,
-    fill = "grey70",
-    colour = "grey45",
-    alpha = 0.35,
-    linewidth = 0.35,
-    outlier.shape = NA
-  ) +
-  facet_wrap(~ predictor_label, nrow = 1) +
-  scale_x_continuous(limits = breeding_effect_x_limits, expand = expansion(mult = 0.04), breaks = c(-60, -30, 0, 30, 60)) +
-  scale_y_continuous(
-    limits = c(0, breeding_effect_distribution_y_max),
-    breaks = NULL,
-    expand = expansion(mult = c(0, 0.04))
-  ) +
-  labs(x = NULL, y = NULL) +
-  breeding_effect_theme +
-  theme(
-    panel.grid = element_blank(),
-    axis.text = element_blank(),
-    plot.margin = margin(5.5, 5.5, 0, 5.5)
-  )
-
-breeding_effect_slope_plot <-
-  ggplot(
-    breeding_effect_plot_data,
-    aes(x = phenology_shift, y = midpoint_shift)
-  ) +
-  geom_hline(yintercept = 0, linewidth = 0.35, colour = "grey75") +
-  geom_vline(xintercept = 0, linewidth = 0.35, colour = "grey75") +
-  geom_ribbon(
-    aes(ymin = midpoint_shift_lower, ymax = midpoint_shift_upper),
-    fill = "grey75",
-    alpha = 0.45
-  ) +
-  geom_line(linewidth = 0.8, colour = "grey25") +
-  facet_wrap(~ predictor_label, nrow = 1) +
-  scale_x_continuous(limits = breeding_effect_x_limits, expand = expansion(mult = 0.04), breaks = c(-60, -30, 0, 30, 60)) +
-  labs(
-    x = "Phenology shift (days)",
-    y = "Predicted shift in post-breeding molt midpoint (days)",
-    # caption = "Upper panels show the observed bird-season phenology distributions; lower panels show posterior median slopes from the single-predictor models with 95% CrIs."
-  ) +
-  breeding_effect_theme +
-  theme(
-    strip.text = element_blank(),
-    panel.grid.major.x = element_line(linewidth = 0.25, lineend = "round", colour = "grey90"),
-    panel.grid.major.y = element_line(linewidth = 0.25, lineend = "round", colour = "grey90"),
-    plot.margin = margin(0, 5.5, 5.5, 5.5),
-    plot.caption = element_text(size = 8, colour = "grey35", hjust = 0)
-  )
-
-fig_4 <-
-  breeding_effect_distribution_plot /
-  breeding_effect_slope_plot +
-  plot_layout(heights = c(0.8, 3))
-
-
+```{r afy-figure4, echo=FALSE, fig.width=7, fig.height=3.5, fig.dpi=300}
+# Use the bundled, openly licensed font so the figure is portable.
+lato_regular <- here("assets/fonts/Lato-Regular.ttf")
+stopifnot(file.exists(lato_regular))
+sysfonts::font_add("Lato", regular = lato_regular)
+figure4_previous_showtext_options <- showtext::showtext_opts()
+showtext::showtext_opts(dpi = 300)
+showtext::showtext_auto()
+afy_plot_data <- afy_summary %>%
+  filter(component != "Among minus within") %>%
+  mutate(component = factor(component,
+                             levels = c("Among individuals", "Within individuals")),
+         predictor = factor(predictor, levels = rev(afy_specs$label)))
+afy_figure <- ggplot(afy_plot_data, aes(x = median, y = predictor,
+                                      colour = component, shape = component)) +
+  geom_vline(xintercept = 0, colour = "grey60", linetype = "dashed", linewidth = 0.4) +
+  geom_errorbar(aes(xmin = ci_lower, xmax = ci_upper),
+                orientation = "y", width = 0.12, linewidth = 0.65,
+                position = position_dodge(width = 0.4)) +
+  geom_point(size = 2.8, position = position_dodge(width = 0.4)) +
+  scale_colour_manual(values = c("Among individuals" = "#4E79A7",
+                                 "Within individuals" = "#F28E2B")) +
+  scale_shape_manual(values = c("Among individuals" = 16, "Within individuals" = 16)) +
+  labs(x = "Post-breeding molt delay per one-day breeding-date delay (days)",
+       y = NULL, colour = NULL, shape = NULL) +
+  theme_bw(base_size = 10, base_family = "Lato") +
+  theme(text = element_text(family = "Lato", face = "plain"),
+        panel.border = element_blank(), panel.grid.minor = element_blank(),
+        panel.grid.major.y = element_blank(),
+        legend.position = "top",
+        legend.text = element_text(size = 8),
+        axis.title = element_text(size = 11, colour = "black"),
+        axis.ticks = element_blank(),
+        axis.text = element_text(size = 9, colour = "grey30"))
+afy_figure
+ggsave(here("figs", "Figure5_afy_components_revision3.pdf"), afy_figure,
+       width = 7, height = 3.5, device = cairo_pdf)
+ggsave(here("figs", "Figure5_afy_components_revision3.png"), afy_figure,
+       width = 7, height = 3.5, dpi = 300, bg = "white")
+showtext::showtext_auto(FALSE)
+do.call(showtext::showtext_opts, figure4_previous_showtext_options)
 ```
 
-```{r}
-ggsave(
-  plot = fig_4,
-  filename = "fig4.pdf",
-  path = here("figs/"),
-  device = cairo_pdf,
-  width = 8.5,
-  height = 7
-)
-```
+**Figure 4.** After-first-year breeding-date associations with molt midpoint.
+Points show posterior medians and lines show 95% credible intervals from
+three separate AFY models. Colour distinguishes associations
+among individuals from seasonal associations within individuals. Intervals crossing
+zero indicate no clear association, rather than evidence of zero plasticity.
+
 
 ## Supporting analyses referenced in the manuscript
 
-### Is age associated with breeding phenology?
-```{r}
+### Figure S2 — approximate power analysis {#migration-power}
+
+We assessed the sensitivity of the migratory-status model to differences in
+the molt midpoint between residents and migrants. The fitted model included
+`r nrow(sex_migratory_status_mod$data)` scored photographs from
+`r n_distinct(sex_migratory_status_mod$data$rings_comb)` birds across
+`r nrow(distinct(sex_migratory_status_mod$data, rings_comb, season))`
+bird-seasons. Of these birds, eight were migrants and 33 were residents.
+We used the posterior standard deviation of the resident minus migrant
+contrast in $t_0$ to approximate the precision of the same model and sample
+design in repeated studies. The calculation retains the model's
+$N(0, 0.5^2)$ prior on the season-standardized $t_0$ coefficient. For each
+assumed true difference, we calculated the probability that a two-sided
+95% posterior interval would exclude zero. This is an approximate power
+calculation conditional on the observed model precision and sample design.
+It does not include refitting the full nonlinear model to simulated data.
+
+```{r migratory-status-power-calculation}
 #| code-fold: true
-#| code-summary: "Show code for data wrangle steps for analysis of age and breeding phenology"
-# wrangle age-class breeding-phenology data
-dat_age_class_breed <- dat_breeding %>%
-  select(
-    rings_comb, sex, age_class,
-    last_breeding_date_J_snum,
-    first_breeding_date_J_snum,
-    last_nest_first_obs_J_snum
-  ) %>%
-  distinct() %>%
-  drop_na(
-    rings_comb, sex, age_class,
-    last_breeding_date_J_snum,
-    first_breeding_date_J_snum,
-    last_nest_first_obs_J_snum
-  ) %>%
-  as.data.frame()
-```
+#| code-summary: "Show the normal-approximation power calculation"
+status_power_data <- sex_migratory_status_mod$data
+status_power_draws <- as_draws_df(sex_migratory_status_mod$fitted_model)
+status_power_date_sd <- weighted_date_scaling(status_power_data)$weighted_sd
 
-```{r, eval=FALSE}
-# Weakly-informative priors suitable for season-standardized outcomes
-priors_gauss <- c(
-  prior(normal(0, 2), class = "b"),          # fixed effects (incl. migratory_status)
-  prior(normal(0, 5), class = "Intercept"),  # intercept
-  prior(exponential(1), class = "sd"),       # random effect SDs
-  prior(exponential(1), class = "sigma")     # residual SD
+# The coefficient is resident minus migrant on the season-standardised t0 scale.
+status_effect_days <- status_power_draws$b_t0_migratory_statusR *
+  status_power_date_sd
+status_posterior_sd <- sd(status_effect_days)
+status_prior_sd <- 0.5 * status_power_date_sd
+
+# Normal prior and likelihood: 1/posterior_var =
+# 1/prior_var + 1/likelihood_var. Recover the likelihood precision and
+# account for shrinkage of the posterior mean toward the zero-centred prior.
+stopifnot(status_posterior_sd < status_prior_sd)
+status_likelihood_sd <- 1 / sqrt(
+  1 / status_posterior_sd^2 - 1 / status_prior_sd^2
 )
+status_shrinkage <- status_posterior_sd^2 / status_likelihood_sd^2
+status_detection_cutoff <- qnorm(0.975) *
+  status_posterior_sd / status_shrinkage
 
-# Age class (FY vs AFY), matching the main age-class moult model logic
-mod_age_class_first_brms <- brm(
-  first_breeding_date_J_snum ~ sex + age_class + (1 | rings_comb),
-  data   = dat_age_class_breed,
-  family = gaussian(),
-  prior  = priors_gauss,
-  chains = 4, cores = 4, iter = 4000, warmup = 1000,
-  seed   = 123
-)
-
-mod_age_class_last_brms <- brm(
-  last_breeding_date_J_snum ~ sex + age_class + (1 | rings_comb),
-  data   = dat_age_class_breed,
-  family = gaussian(),
-  prior  = priors_gauss,
-  chains = 4, cores = 4, iter = 4000, warmup = 1000,
-  seed   = 123
-)
-
-mod_age_class_lay_brms <- brm(
-  last_nest_first_obs_J_snum ~ sex + age_class + (1 | rings_comb),
-  data   = dat_age_class_breed,
-  family = gaussian(),
-  prior  = priors_gauss,
-  chains = 4, cores = 4, iter = 4000, warmup = 1000,
-  seed   = 123
-)
-```
-
-```{r, eval=FALSE, echo=FALSE}
-saveRDS(list(fitted_model = mod_age_class_first_brms, data = dat_age_class_breed),
-        file = here("out/mod_age_class_first_brms_.rds"))
-saveRDS(list(fitted_model = mod_age_class_last_brms, data = dat_age_class_breed),
-        file = here("out/mod_age_class_last_brms_.rds"))
-saveRDS(list(fitted_model = mod_age_class_lay_brms, data = dat_age_class_breed),
-        file = here("out/mod_age_class_lay_brms_.rds"))
-```
-
-```{r, include=FALSE}
-mod_age_class_first_brms <- readRDS(here("out/mod_age_class_first_brms_.rds"))
-mod_age_class_last_brms <- readRDS(here("out/mod_age_class_last_brms_.rds"))
-mod_age_class_lay_brms <- readRDS(here("out/mod_age_class_lay_brms_.rds"))
-
-# Summaries (posterior medians/means + CrIs)
-summary(mod_age_class_first_brms$fitted_model)
-summary(mod_age_class_last_brms$fitted_model)
-summary(mod_age_class_lay_brms$fitted_model)
-
-# Random-effect SDs and correlations
-VarCorr(mod_age_class_first_brms$fitted_model)
-VarCorr(mod_age_class_last_brms$fitted_model)
-VarCorr(mod_age_class_lay_brms$fitted_model)
-```
-
-```{r, include=FALSE}
-summarise_breeding_age_class <- function(first_model, nest_model, last_model) {
-  first_post <- as_draws_df(first_model$fitted_model)
-  nest_post <- as_draws_df(nest_model$fitted_model)
-  last_post <- as_draws_df(last_model$fitted_model)
-
-  bind_rows(
-    summary_row(
-      "Δ first breeding date (AFY - FY; days)",
-      "Posterior estimates (fixed effects)",
-      "Age and breeding phenology",
-      first_post$b_age_classAFY
-    ),
-    summary_row(
-      "Δ last nest initiation date (AFY - FY; days)",
-      "Posterior estimates (fixed effects)",
-      "Age and breeding phenology",
-      nest_post$b_age_classAFY
-    ),
-    summary_row(
-      "Δ last breeding date (AFY - FY; days)",
-      "Posterior estimates (fixed effects)",
-      "Age and breeding phenology",
-      last_post$b_age_classAFY
+status_power <- function(true_effect_days) {
+  pnorm(
+    -status_detection_cutoff,
+    mean = true_effect_days,
+    sd = status_likelihood_sd
+  ) +
+    pnorm(
+      status_detection_cutoff,
+      mean = true_effect_days,
+      sd = status_likelihood_sd,
+      lower.tail = FALSE
     )
-  )
 }
 
-age_class_breed_summary_table <- summarise_breeding_age_class(
-  mod_age_class_first_brms,
-  mod_age_class_lay_brms,
-  mod_age_class_last_brms
+status_effect_for_80_power <- uniroot(
+  function(effect_days) status_power(effect_days) - 0.8,
+  interval = c(0, 60)
+)$root
+status_effect_for_90_power <- uniroot(
+  function(effect_days) status_power(effect_days) - 0.9,
+  interval = c(0, 60)
+)$root
+
+status_power_curve <- tibble(
+  true_effect_days = seq(0, 35, by = 0.1),
+  detection_probability = status_power(true_effect_days)
 )
 ```
 
-#### Summary table: age class (FY vs AFY)
-```{r, echo=FALSE}
-display_result_table(age_class_breed_summary_table)
+Under this approximation, an absolute resident–migrant difference of
+`r sprintf("%.1f", status_effect_for_80_power)` days would have an 80%
+probability of producing a 95% posterior interval that excludes zero. A
+`r sprintf("%.1f", status_effect_for_90_power)`-day difference would have
+a 90% probability. The observed posterior median difference was
+`r sprintf("%.1f", median(status_effect_days))` days (resident minus migrant),
+with a 95% credible interval of
+[`r sprintf("%.1f", quantile(status_effect_days, 0.025))`,
+`r sprintf("%.1f", quantile(status_effect_days, 0.975))`] days. The power
+to detect a 10-day difference was only
+`r sprintf("%.0f", 100 * status_power(10))`%. The power curve describes
+sensitivity to assumed effect sizes, rather than evidence that an effect
+of any particular size is present.
+
+```{r migratory-status-power-figure, echo=FALSE}
+#| fig-cap: "Figure S2. Approximate power to detect a migratory-status difference in molt midpoint. The curve gives the probability that a two-sided 95% posterior interval excludes zero for a specified absolute resident–migrant difference. It uses the observed model precision, the original prior, and the current sample design (8 migrants and 33 residents). Dashed lines mark 80% power and the corresponding effect size."
+#| fig-width: 7
+#| fig-height: 4.5
+status_power_plot <- ggplot(
+  status_power_curve,
+  aes(x = true_effect_days, y = detection_probability)
+) +
+  geom_hline(yintercept = 0.8, linetype = "dashed", colour = "grey55") +
+  geom_vline(
+    xintercept = status_effect_for_80_power,
+    linetype = "dashed",
+    colour = "grey55"
+  ) +
+  geom_line(linewidth = 1.1, colour = "#B07AA1") +
+  geom_point(
+    data = tibble(
+      true_effect_days = status_effect_for_80_power,
+      detection_probability = 0.8
+    ),
+    size = 2.6,
+    shape = 21,
+    fill = "#B07AA1",
+    colour = "white"
+  ) +
+  annotate(
+    "text",
+    x = status_effect_for_80_power + 1,
+    y = 0.74,
+    label = paste0(round(status_effect_for_80_power, 1), " days"),
+    hjust = 0,
+    size = 3.5,
+    colour = "#6D4E70"
+  ) +
+  scale_x_continuous(breaks = seq(0, 35, 5), limits = c(0, 35)) +
+  scale_y_continuous(
+    breaks = seq(0, 1, 0.2),
+    labels = scales::percent_format(accuracy = 1),
+    limits = c(0, 1)
+  ) +
+  labs(
+    x = "Absolute difference between residents and migrants in molt midpoint (days)",
+    y = "Probability of detecting a difference"
+  ) +
+  luke_theme +
+  theme(legend.position = "none")
+
+print(status_power_plot)
+
+ggsave(
+  plot = status_power_plot,
+  filename = "FigS3.pdf",
+  path = here("figs/"),
+  device = cairo_pdf,
+  width = 7,
+  height = 4.5
+)
 ```
 
-#### Fixed effects with 95% CrI
-Age class (FY vs AFY)
-```{r}
-fixef(mod_age_class_first_brms$fitted_model, probs = c(0.025, 0.5, 0.975)) %>%
-  round(2)
+### Supplementary sex interactions {#supplementary-interactions}
 
-fixef(mod_age_class_lay_brms$fitted_model, probs = c(0.025, 0.5, 0.975)) %>%
-  round(2)
+Both sexes provide parental care in banded dotterels, giving a basis for expecting broadly similar associations between late breeding and molt. However, shared care does not establish equal reproductive costs. Differences between sexes in reproductive costs or preparation for migration could also produce different resident–migrant contrasts. We therefore fitted two supplementary midpoint models to assess sex differences in the breeding–molt association and in the migration contrast. For last observed breeding date, we extended the main AFY
+model by including interactions between sex and both a bird's mean
+season-centered breeding date and its seasonal deviation from that mean.
+We used last observed breeding date to examine the association with late
+parental-care activity. The model retained the same data, centering, priors,
+season effects and random-effects structure as the main AFY model. The
+second model adds an interaction between sex and migratory status to the
+migratory-status model. Both supplementary models retain a shared
+transition-steepness parameter ($k$) and test effects on molt midpoint
+($t_0$), not molt rate.
 
-fixef(mod_age_class_last_brms$fitted_model, probs = c(0.025, 0.5, 0.975)) %>%
-  round(2)
-```
+The breeding-date interaction contains 1,045 scored photographs from 47
+confidently AFY birds across 86 bird-seasons: 30 females and 17 males,
+contributing 58 and 28 bird-seasons, respectively. Twenty females and eight
+males contributed repeated AFY seasons. We retained birds with one AFY
+season for the among-individual comparison. The migration sample contains
+882 scored photographs from 41 birds across 99 bird-seasons, including
+three female and five male migrants.
 
-### Do known siblings show unusually similar molt phenotypes?
-This exploratory analysis uses the trusted sibling pairs whose recruitment histories can be linked to uniquely coded nest IDs (`N11`, `N37`, `N39`, `N20`, and `N45`). To keep the phenotype estimates targeted to this question, we fit dedicated sibling-cohort models rather than borrowing posterior phenotypes from the full age-class model. The overall sibling model includes sex and age class as fixed effects, with season added to the `t0` submodel, and asks whether the observed sibling pairs are more similar than alternative pairings of the same 10 birds after controlling for those fixed effects. Separate FY-only and AFY-only sibling models then ask whether any sibling similarity is confined to the FY cohort or also appears among AFY siblings. Because the AFY birds were observed in multiple seasons, their sibling comparison is based on the posterior mean phenotype averaged across the seasons in which each bird was observed.
+We fitted both supplementary models using `brms` with `cmdstanr` as the
+backend, running four parallel chains of 10,000 iterations each, including
+5,000 warmup iterations. Both models used a target acceptance rate of 0.999
+and a maximum tree depth of 15. Rendering reads the completed fits without
+refitting either model.
 
-```{r}
+For the AFY sex interaction, let $m_i=1$ for males and 0 for females, and let $L_{is}$ denote the fixed and random terms in equation (4). We fitted
+
+$$
+t_{0,is}=L_{is}+\gamma_B\bar{x}_i+\gamma_W(x_{is}-\bar{x}_i)
++\eta_Bm_i\bar{x}_i+\eta_Wm_i(x_{is}-\bar{x}_i).
+$$
+
+Female slopes are $\gamma_B$ and $\gamma_W$, and male slopes are $\gamma_B+\eta_B$ and $\gamma_W+\eta_W$. The coefficients $\eta_B$ and $\eta_W$ directly compare the sexes. In the migration interaction, we instead added $\eta_{MR}m_ir_i$ to the additive sex, resident-status and season midpoint terms, where $r_i=1$ for residents and 0 for migrants. The coefficient $\eta_{MR}$ compares the resident–migrant difference between males and females.
+
+```{r supplementary-interaction-model-fits, eval=FALSE}
 #| code-fold: true
-#| code-summary: "Show code for sibling-pair wrangle and sibling-model datasets"
-sibling_pairs <- tibble(
-  family_id = c("RB_FY", "RG_FY_A", "RG_FY_B", "RB_AFY", "RR_AFY"),
-  bird_1 = c("RBWY", "RGGW", "RGOO", "RBBY", "RRBR"),
-  bird_2 = c("RBYG", "RGGY", "RGOB", "RBRB", "RRBY"),
-  cohort = c("FY", "FY", "FY", "AFY", "AFY"),
-  trusted_nest_id = c("N11", "N39", "N37", "N20", "N45")
-)
-
-sibling_birds <- sort(unique(c(sibling_pairs$bird_1, sibling_pairs$bird_2)))
-
-dat_sibling_all_mod <- dat_breeding %>%
-  select(score, date_J, rings_comb, sex, season, age_class) %>%
-  distinct() %>%
-  filter(rings_comb %in% sibling_birds) %>%
-  add_reference_date_scaling() %>%
-  drop_na(score, date_J_scaled, rings_comb, sex, season, age_class) %>%
-  as.data.frame()
-
-dat_sibling_fy_mod <- dat_sibling_all_mod %>%
-  filter(age_class == "FY") %>%
-  as.data.frame()
-
-dat_sibling_afy_mod <- dat_sibling_all_mod %>%
-  filter(age_class == "AFY") %>%
-  as.data.frame()
-
-mod_sibling_all <- bf(
-  score ~ 1 + (baseline - 1) * (1 - 1 / (1 + exp(-k * (date_J_scaled - t0)))),
-  baseline ~ sex + age_class + (1 | i | rings_comb) + (1 | rings_comb:season),
-  t0 ~ sex + season + age_class + (1 | i | rings_comb) + (1 | rings_comb:season),
-  k ~ 1,
-  nl = TRUE
-)
-
-mod_sibling_fy <- bf(
-  score ~ 1 + (baseline - 1) * (1 - 1 / (1 + exp(-k * (date_J_scaled - t0)))),
-  baseline ~ sex + (1 | i | rings_comb),
-  t0 ~ sex + (1 | i | rings_comb),
-  k ~ 1,
-  nl = TRUE
-)
-
-mod_sibling_afy <- bf(
+#| code-summary: "Show code for the two supplementary interaction fits"
+# The same mean/deviation construction as the main AFY model is retained.
+afy_sex_interaction_formula <- bf(
   score ~ 1 + (baseline - 1) * (1 - 1 / (1 + exp(-k * (date_J_scaled - t0)))),
   baseline ~ sex + (1 | i | rings_comb) + (1 | rings_comb:season),
-  t0 ~ sex + season + (1 | i | rings_comb) + (1 | rings_comb:season),
+  t0 ~ sex * (breeding_mean_i + breeding_dev_is) + season +
+    (1 | i | rings_comb) + (1 | rings_comb:season),
+  k ~ 1, nl = TRUE
+)
+# The original script takes the exact saved data and user priors from the
+# main AFY last-observed-breeding-date fit, with seed 264.
+primary_afy_last <- readRDS(here("out/sex_last_breed_within_individual_afy_mod_.rds"))
+fit_afy_sex_interaction <- brm(
+  formula = afy_sex_interaction_formula, data = primary_afy_last$data,
+  family = gaussian(), prior = moult_priors,
+  chains = 4, cores = 4, iter = 10000, warmup = 5000,
+  backend = "cmdstanr", seed = 264,
+  control = list(adapt_delta = 0.999, max_treedepth = 15)
+)
+
+# It also audits centering and saves the model, settings and diagnostics.
+# source(here("scripts/run_afy_sex_last_breeding_interaction_2026-11-18.R"))
+
+migration_interaction_formula <- bf(
+  score ~ 1 + (baseline - 1) * (1 - 1 / (1 + exp(-k * (date_J_scaled - t0)))),
+  baseline ~ sex + migratory_status +
+    (1 | i | rings_comb) + (1 | rings_comb:season),
+  t0 ~ sex * migratory_status + season +
+    (1 | i | rings_comb) + (1 | rings_comb:season),
   k ~ 1,
   nl = TRUE
 )
+
+fit_migration_interaction <- brm(
+  formula = migration_interaction_formula,
+  data = dat_migratory_status_mod,
+  family = gaussian(),
+  prior = moult_priors,
+  control = list(adapt_delta = 0.999, max_treedepth = 15),
+  chains = 4, cores = 4, iter = 10000, warmup = 5000,
+  backend = "cmdstanr", seed = 242
+)
+saveRDS(
+  list(fitted_model = fit_migration_interaction,
+       data = dat_migratory_status_mod),
+  here("out/sex_migratory_interaction_mod_.rds")
+)
 ```
 
-#### Table: trusted sibling pairs used in the phenotype analysis
-```{r, echo=FALSE}
-sibling_season_lookup <- dat_sibling_all_mod %>%
-  distinct(rings_comb, season, age_class) %>%
-  filter(rings_comb %in% sibling_birds) %>%
-  group_by(rings_comb) %>%
-  summarise(
-    seasons_observed = paste(sort(unique(as.character(season))), collapse = ", "),
-    age_class = paste(sort(unique(as.character(age_class))), collapse = ", "),
-    .groups = "drop"
-  )
+```{r supplementary-interaction-summaries, echo=TRUE, results="hide"}
+last_breeding_interaction <- readRDS(
+  here("out/afy_sex_last_breeding_interaction_2026-11-18/model.rds")
+)
+migration_interaction <- readRDS(
+  here("out/sex_migratory_interaction_mod_.rds")
+)
 
-knitr::kable(
-  sibling_pairs %>%
-    left_join(
-      sibling_season_lookup %>%
-        rename(bird_1 = rings_comb, bird_1_seasons = seasons_observed, bird_1_age_class = age_class),
-      by = "bird_1"
-    ) %>%
-    left_join(
-      sibling_season_lookup %>%
-        rename(bird_2 = rings_comb, bird_2_seasons = seasons_observed, bird_2_age_class = age_class),
-      by = "bird_2"
-    ) %>%
-    transmute(
-      Cohort = cohort,
-      Family = family_id,
-      `Nest ID` = trusted_nest_id,
-      `Bird 1` = bird_1,
-      `Bird 1 age class` = bird_1_age_class,
-      `Bird 1 seasons` = bird_1_seasons,
-      `Bird 2` = bird_2,
-      `Bird 2 age class` = bird_2_age_class,
-      `Bird 2 seasons` = bird_2_seasons
+breeding_interaction_draws <- as_draws_df(
+  last_breeding_interaction$fitted_model
+)
+migration_interaction_draws <- as_draws_df(
+  migration_interaction$fitted_model
+)
+# Use the primary AFY model's stored conversion, not a recalculated scale.
+stopifnot(
+  identical(last_breeding_interaction$data,
+            afy_models[["Last observed breeding date"]]$data),
+  nrow(last_breeding_interaction$data) == 1045L,
+  n_distinct(last_breeding_interaction$data$rings_comb) == 47L,
+  nrow(distinct(last_breeding_interaction$data, rings_comb, season)) == 86L,
+  all(last_breeding_interaction$data$age_class == "AFY")
+)
+breeding_date_sd <- last_breeding_interaction$midpoint_days_conversion
+migration_date_sd <- weighted_date_scaling(
+  migration_interaction$data
+)$weighted_sd
+
+breeding_among_interaction_col <- find_posterior_draw_col(
+  breeding_interaction_draws,
+  c("^b_t0_", "sexM", "breeding_mean_i"),
+  "sex by among-individual last breeding date interaction"
+)
+breeding_within_interaction_col <- find_posterior_draw_col(
+  breeding_interaction_draws,
+  c("^b_t0_", "sexM", "breeding_dev_is"),
+  "sex by within-individual last breeding date interaction"
+)
+migration_interaction_col <- find_posterior_draw_col(
+  migration_interaction_draws,
+  c("^b_t0_", "sexM", "migratory_statusR"),
+  "sex by migratory status interaction"
+)
+
+female_breeding_among_slope <-
+  breeding_interaction_draws$b_t0_breeding_mean_i * breeding_date_sd
+female_breeding_within_slope <-
+  breeding_interaction_draws$b_t0_breeding_dev_is * breeding_date_sd
+breeding_among_slope_difference <-
+  breeding_interaction_draws[[breeding_among_interaction_col]] * breeding_date_sd
+breeding_within_slope_difference <-
+  breeding_interaction_draws[[breeding_within_interaction_col]] * breeding_date_sd
+male_breeding_among_slope <-
+  female_breeding_among_slope + breeding_among_slope_difference
+male_breeding_within_slope <-
+  female_breeding_within_slope + breeding_within_slope_difference
+
+female_resident_migrant_difference <-
+  migration_interaction_draws$b_t0_migratory_statusR *
+  migration_date_sd
+male_resident_migrant_difference <-
+  (migration_interaction_draws$b_t0_migratory_statusR +
+     migration_interaction_draws[[migration_interaction_col]]) *
+  migration_date_sd
+migration_difference_of_differences <-
+  migration_interaction_draws[[migration_interaction_col]] *
+  migration_date_sd
+
+supplementary_interaction_table <- bind_rows(
+  summary_row(
+    "Last observed breeding date: among-individual slope, females",
+    "Posterior estimates (sex-specific slopes)",
+    "AFY sex by breeding date", female_breeding_among_slope
   ),
-  align = c("l", "l", "l", "l", "l", "l", "l", "l", "l")
+  summary_row(
+    "Last observed breeding date: among-individual slope, males",
+    "Posterior estimates (sex-specific slopes)",
+    "AFY sex by breeding date", male_breeding_among_slope
+  ),
+  summary_row(
+    "Male minus female among-individual slope",
+    "Posterior contrasts", "AFY sex by breeding date",
+    breeding_among_slope_difference
+  ),
+  summary_row(
+    "Last observed breeding date: within-individual slope, females",
+    "Posterior estimates (sex-specific slopes)",
+    "AFY sex by breeding date", female_breeding_within_slope
+  ),
+  summary_row(
+    "Last observed breeding date: within-individual slope, males",
+    "Posterior estimates (sex-specific slopes)",
+    "AFY sex by breeding date", male_breeding_within_slope
+  ),
+  summary_row(
+    "Male minus female within-individual slope",
+    "Posterior contrasts", "AFY sex by breeding date",
+    breeding_within_slope_difference
+  ),
+  summary_row(
+    "Females: resident minus migrant midpoint (days)",
+    "Posterior estimates (state-specific means)",
+    "Sex by migratory status", female_resident_migrant_difference
+  ),
+  summary_row(
+    "Males: resident minus migrant midpoint (days)",
+    "Posterior estimates (state-specific means)",
+    "Sex by migratory status", male_resident_migrant_difference
+  ),
+  summary_row(
+    "Male minus female resident–migrant contrast (days)",
+    "Posterior contrasts", "Sex by migratory status",
+    migration_difference_of_differences
+  )
 )
 ```
 
-```{r, eval=FALSE}
-#| code-fold: true
-#| code-summary: "Show code for fitting the overall sibling-cohort model"
-fit_mod_sibling_all <- brm(
-  formula = mod_sibling_all,
-  data = dat_sibling_all_mod,
-  family = gaussian(),
-  prior = moult_priors,
-  control = list(adapt_delta = 0.9999, max_treedepth = 15),
-  chains = 4,
-  cores = 4,
-  iter = 10000,
-  warmup = 5000,
-  backend = "cmdstanr",
-  seed = 601
+**Table S1.** Estimated sex-specific associations with molt midpoint in
+the supplementary interaction models. Among-individual slopes describe the
+change in molt midpoint, in days, per one-day delay in a bird's average
+season-centered last observed breeding date. Within-individual slopes
+describe the change in midpoint per one-day delay relative to the bird's
+own average. Sex contrasts compare the male and female slopes. Migration
+contrasts are expressed in days. A positive resident–migrant contrast
+means that residents reached the midpoint later.
+
+```{r supplementary-interaction-results, echo=TRUE}
+display_result_table(supplementary_interaction_table)
+```
+
+The AFY breeding-date interaction showed no clear sex difference in either
+the among-individual association with molt midpoint (male–female slope
+contrast: `r supplementary_interaction_table$median_CI[[3]]`) or the
+within-individual association (`r supplementary_interaction_table$median_CI[[6]]`).
+Neither sex showed a clear within-individual association. Although the male
+among-individual interval excludes zero and the female interval includes
+zero, the direct male–female comparison does not show a clear sex
+difference. Only eight males contributed repeated AFY seasons, and the
+intervals do not establish that males and females respond similarly to
+later breeding.
+
+The male–female difference in the resident–migrant contrast was
+`r supplementary_interaction_table$median_CI[[9]]` days. With only three female
+and five male migrants, the broad interval does not resolve whether
+migratory status has a different association with molt timing in the two
+sexes.
+
+```{r supplementary-interaction-diagnostics, echo=FALSE}
+interaction_models <- list(
+  "AFY sex by among/within last breeding date" = last_breeding_interaction,
+  "Sex by migratory status" = migration_interaction
 )
-```
-
-```{r, eval=FALSE}
-#| code-fold: true
-#| code-summary: "Show code for fitting the FY-only sibling model"
-fit_mod_sibling_fy <- brm(
-  formula = mod_sibling_fy,
-  data = dat_sibling_fy_mod,
-  family = gaussian(),
-  prior = moult_priors_fy,
-  control = list(adapt_delta = 0.9999, max_treedepth = 15),
-  chains = 4,
-  cores = 4,
-  iter = 10000,
-  warmup = 5000,
-  backend = "cmdstanr",
-  seed = 602
+interaction_diagnostics <- model_diagnostics_table(
+  interaction_models
 )
-```
-
-```{r, eval=FALSE}
-#| code-fold: true
-#| code-summary: "Show code for fitting the AFY-only sibling model"
-fit_mod_sibling_afy <- brm(
-  formula = mod_sibling_afy,
-  data = dat_sibling_afy_mod,
-  family = gaussian(),
-  prior = moult_priors,
-  control = list(adapt_delta = 0.9999, max_treedepth = 15),
-  chains = 4,
-  cores = 4,
-  iter = 10000,
-  warmup = 5000,
-  backend = "cmdstanr",
-  seed = 603
+interaction_diagnostics$n_divergent <- vapply(
+  interaction_models,
+  function(model_obj) {
+    np <- brms::nuts_params(model_obj$fitted_model)
+    sum(np$Value[np$Parameter == "divergent__"])
+  },
+  numeric(1)
 )
+interaction_diagnostics %>%
+  knitr::kable()
 ```
 
-```{r, eval=FALSE, echo=FALSE}
-saveRDS(
-  list(fitted_model = fit_mod_sibling_all, data = dat_sibling_all_mod),
-  file = here("out/sex_sibling_all_mod_.rds")
-)
 
-saveRDS(
-  list(fitted_model = fit_mod_sibling_fy, data = dat_sibling_fy_mod),
-  file = here("out/sex_sibling_fy_mod_.rds")
-)
+### Last local photographs of classified migrants and residents {#last-local-photographs}
 
-saveRDS(
-  list(fitted_model = fit_mod_sibling_afy, data = dat_sibling_afy_mod),
-  file = here("out/sex_sibling_afy_mod_.rds")
-)
+This descriptive comparison uses one final scored date per bird-season.
+It does not identify departure, and repeated seasons are not independent
+birds. Detection and the chance of obtaining a scorable photograph may
+also vary. We therefore do not interpret similar final scores as equal
+plumage at departure.
+
+```{r last-local-photograph-summary, echo=TRUE}
+last_local_photos <- dat_breeding %>%
+  select(rings_comb, sex, season, migratory_status, date, score) %>%
+  distinct() %>%
+  filter(!is.na(score), !is.na(date), !is.na(migratory_status)) %>%
+  group_by(rings_comb, season, sex, migratory_status) %>%
+  filter(date == max(date)) %>%
+  summarise(date = first(date), score = mean(as.numeric(score)), .groups = "drop")
+late_local_photos <- last_local_photos %>%
+  filter(format(date, "%m") %in% c("02", "03"))
+late_local_photos %>% group_by(migratory_status) %>%
+  summarise(`Bird-seasons` = n(), Birds = n_distinct(rings_comb),
+            `Mean final score` = mean(score), `Final score above 1` = sum(score > 1),
+            .groups = "drop") %>% knitr::kable(digits = 2)
 ```
 
-```{r, include=FALSE}
-pair_key <- function(a, b) {
-  paste(pmin(a, b), pmax(a, b), sep = "__")
-}
+Two classified migrants still scored 2 on 15 March 2023. The absence of
+post-departure photographs of these marked birds prevents establishing
+whether their rufous-band replacement was complete at departure.
 
-generate_perfect_matchings <- function(ids) {
-  if (length(ids) == 0) {
-    return(list(list()))
-  }
+### First-year breeding records
 
-  first_id <- ids[[1]]
-  out <- list()
+Only two first-year bird-seasons had linked breeding dates. The following table reports those observations rather than fitting an age-by-breeding-duration interaction. The two observations cannot establish whether breeding schedules differ by age class.
 
-  for (i in 2:length(ids)) {
-    pair_i <- c(first_id, ids[[i]])
-    remaining_ids <- ids[-c(1, i)]
-    sub_matchings <- generate_perfect_matchings(remaining_ids)
-
-    for (j in seq_along(sub_matchings)) {
-      out[[length(out) + 1]] <- c(list(pair_i), sub_matchings[[j]])
-    }
-  }
-
-  out
-}
-
-build_sibling_bird_phenotypes <- function(model_obj, bird_ids) {
-  post <- as_draws_df(model_obj$fitted_model)
-  re_list <- brms::ranef(model_obj$fitted_model, summary = FALSE)
-  has_bird_season <- "rings_comb:season" %in% names(re_list)
-
-  bird_info <- model_obj$data %>%
-    select(any_of(c(
-      "rings_comb", "season", "sex", "age_class",
-      "date_J_mean_ref", "date_J_sd_ref"
-    ))) %>%
-    distinct() %>%
-    filter(rings_comb %in% bird_ids) %>%
-    arrange(match(rings_comb, bird_ids), season)
-
-  if (!"age_class" %in% names(bird_info)) {
-    bird_info$age_class <- NA_character_
-  }
-
-  if (!all(c("date_J_mean_ref", "date_J_sd_ref") %in% names(bird_info))) {
-    bird_info <- bird_info %>%
-      select(-any_of(c("date_J_mean_ref", "date_J_sd_ref"))) %>%
-      left_join(date_scaling_ref, by = "season")
-  }
-
-  baseline_bird_season <- sapply(seq_len(nrow(bird_info)), function(i) {
-    row_i <- bird_info[i, ]
-    bird_id <- as.character(row_i$rings_comb)
-    out <- post$b_baseline_Intercept
-
-    out <- out + re_list$rings_comb[, bird_id, "baseline_Intercept"]
-
-    if (has_bird_season) {
-      bird_season_id <- paste0(bird_id, "_", row_i$season)
-      out <- out + re_list$`rings_comb:season`[, bird_season_id, "baseline_Intercept"]
-    }
-
-    out
-  })
-
-  t0_bird_season <- sapply(seq_len(nrow(bird_info)), function(i) {
-    row_i <- bird_info[i, ]
-    bird_id <- as.character(row_i$rings_comb)
-    out <- post$b_t0_Intercept
-
-    out <- out + re_list$rings_comb[, bird_id, "t0_Intercept"]
-
-    if (has_bird_season) {
-      bird_season_id <- paste0(bird_id, "_", row_i$season)
-      out <- out + re_list$`rings_comb:season`[, bird_season_id, "t0_Intercept"]
-    }
-
-    out * row_i$date_J_sd_ref + row_i$date_J_mean_ref
-  })
-
-  baseline_bird <- sapply(bird_ids, function(bird_id) {
-    rowMeans(
-      baseline_bird_season[, bird_info$rings_comb == bird_id, drop = FALSE]
-    )
-  })
-
-  t0_bird <- sapply(bird_ids, function(bird_id) {
-    rowMeans(
-      t0_bird_season[, bird_info$rings_comb == bird_id, drop = FALSE]
-    )
-  })
-
-  dimnames(baseline_bird) <- list(NULL, bird_ids)
-  dimnames(t0_bird) <- list(NULL, bird_ids)
-
-  list(
-    bird_info = bird_info,
-    baseline_bird = baseline_bird,
-    t0_bird = t0_bird
-  )
-}
-
-summarise_sibling_similarity <- function(
-    bird_ids,
-    sibling_pairs_subset,
-    baseline_draws_mat,
-    t0_draws_mat,
-    cohort_label) {
-  cohort_pairs_mat <- t(combn(bird_ids, 2))
-  cohort_pairs <- tibble(
-    bird_1 = cohort_pairs_mat[, 1],
-    bird_2 = cohort_pairs_mat[, 2]
-  ) %>%
-    mutate(
-      pair_label = paste(bird_1, bird_2, sep = " vs "),
-      pair_key = pair_key(bird_1, bird_2),
-      is_sibling = pair_key %in% pair_key(sibling_pairs_subset$bird_1, sibling_pairs_subset$bird_2)
-    )
-
-  baseline_pair_draws <- sapply(seq_len(nrow(cohort_pairs)), function(i) {
-    abs(
-      baseline_draws_mat[, cohort_pairs$bird_1[[i]]] -
-        baseline_draws_mat[, cohort_pairs$bird_2[[i]]]
-    )
-  })
-
-  t0_pair_draws <- sapply(seq_len(nrow(cohort_pairs)), function(i) {
-    abs(
-      t0_draws_mat[, cohort_pairs$bird_1[[i]]] -
-        t0_draws_mat[, cohort_pairs$bird_2[[i]]]
-    )
-  })
-
-  cohort_pair_summary <- bind_rows(lapply(seq_len(nrow(cohort_pairs)), function(i) {
-    tibble(
-      cohort = cohort_label,
-      pair_label = cohort_pairs$pair_label[[i]],
-      is_sibling = cohort_pairs$is_sibling[[i]],
-      baseline_distance = format_numeric_interval(
-        summarise_posterior(baseline_pair_draws[, i])
-      ),
-      t0_distance = format_numeric_interval(summarise_posterior(t0_pair_draws[, i]))
-    )
-  })) %>%
-    filter(is_sibling)
-
-  cohort_matchings <- generate_perfect_matchings(bird_ids)
-  cohort_pair_index_lookup <- setNames(seq_len(nrow(cohort_pairs)), cohort_pairs$pair_key)
-
-  cohort_matching_index_list <- lapply(cohort_matchings, function(matching_i) {
-    pair_ids_i <- sapply(matching_i, function(pair_i) pair_key(pair_i[[1]], pair_i[[2]]))
-    unname(cohort_pair_index_lookup[pair_ids_i])
-  })
-
-  cohort_matching_summary <- bind_rows(lapply(seq_along(cohort_matching_index_list), function(i) {
-    pair_ids_i <- cohort_pairs$pair_key[cohort_matching_index_list[[i]]]
-
-    tibble(
-      matching_id = i,
-      matching_key = paste(sort(pair_ids_i), collapse = " | ")
-    )
-  }))
-
-  observed_sibling_matching_key <- sibling_pairs_subset %>%
-    mutate(pair_key = pair_key(bird_1, bird_2)) %>%
-    summarise(matching_key = paste(sort(pair_key), collapse = " | ")) %>%
-    pull(matching_key)
-
-  observed_matching_id <- cohort_matching_summary %>%
-    filter(matching_key == observed_sibling_matching_key) %>%
-    pull(matching_id)
-
-  baseline_matching_draws <- sapply(cohort_matching_index_list, function(idx) {
-    rowMeans(baseline_pair_draws[, idx, drop = FALSE])
-  })
-
-  t0_matching_draws <- sapply(cohort_matching_index_list, function(idx) {
-    rowMeans(t0_pair_draws[, idx, drop = FALSE])
-  })
-
-  observed_baseline_matching <- baseline_matching_draws[, observed_matching_id]
-  observed_t0_matching <- t0_matching_draws[, observed_matching_id]
-
-  alternative_baseline_matching <- rowMeans(
-    baseline_matching_draws[, -observed_matching_id, drop = FALSE]
-  )
-  alternative_t0_matching <- rowMeans(
-    t0_matching_draws[, -observed_matching_id, drop = FALSE]
-  )
-
-  observed_baseline_stats <- summarise_posterior(observed_baseline_matching)
-  observed_t0_stats <- summarise_posterior(observed_t0_matching)
-  alternative_baseline_stats <- summarise_posterior(alternative_baseline_matching)
-  alternative_t0_stats <- summarise_posterior(alternative_t0_matching)
-  baseline_difference <- observed_baseline_matching - alternative_baseline_matching
-  t0_difference <- observed_t0_matching - alternative_t0_matching
-  baseline_difference_stats <- summarise_posterior(baseline_difference)
-  t0_difference_stats <- summarise_posterior(t0_difference)
-  baseline_prob_more_similar <- mean(observed_baseline_matching < alternative_baseline_matching)
-  t0_prob_more_similar <- mean(observed_t0_matching < alternative_t0_matching)
-
-  cohort_similarity_summary <- tibble(
-    cohort = cohort_label,
-    trait = c("Baseline expression (adjusted)", "Molt midpoint (t0, adjusted)"),
-    observed_sibling_matching = c(
-      format_numeric_interval(observed_baseline_stats),
-      format_numeric_interval(observed_t0_stats)
-    ),
-    average_alternative_matching = c(
-      format_numeric_interval(alternative_baseline_stats),
-      format_numeric_interval(alternative_t0_stats)
-    ),
-    sibling_minus_alternative = c(
-      format_numeric_interval(baseline_difference_stats),
-      format_numeric_interval(t0_difference_stats)
-    ),
-    prob_siblings_more_similar = c(
-      baseline_prob_more_similar,
-      t0_prob_more_similar
-    ),
-    prob_siblings_closest_matching = c(
-      mean(apply(baseline_matching_draws, 1, which.min) == observed_matching_id),
-      mean(apply(t0_matching_draws, 1, which.min) == observed_matching_id)
-    ),
-    n_matchings = c(ncol(baseline_matching_draws), ncol(t0_matching_draws))
-  )
-
-  cohort_matching_interval_df <- bind_rows(
-    observed_baseline_stats %>%
-      transmute(
-        cohort = cohort_label,
-        trait = "Baseline expression (adjusted)",
-        comparison = "Observed sibling matching",
-        estimate = median,
-        ci_lower = ci_lower,
-        ci_upper = ci_upper,
-        prob_siblings_more_similar = baseline_prob_more_similar
-      ),
-    alternative_baseline_stats %>%
-      transmute(
-        cohort = cohort_label,
-        trait = "Baseline expression (adjusted)",
-        comparison = "Average alternative matching",
-        estimate = median,
-        ci_lower = ci_lower,
-        ci_upper = ci_upper,
-        prob_siblings_more_similar = baseline_prob_more_similar
-      ),
-    observed_t0_stats %>%
-      transmute(
-        cohort = cohort_label,
-        trait = "Molt midpoint (t0, adjusted)",
-        comparison = "Observed sibling matching",
-        estimate = median,
-        ci_lower = ci_lower,
-        ci_upper = ci_upper,
-        prob_siblings_more_similar = t0_prob_more_similar
-      ),
-    alternative_t0_stats %>%
-      transmute(
-        cohort = cohort_label,
-        trait = "Molt midpoint (t0, adjusted)",
-        comparison = "Average alternative matching",
-        estimate = median,
-        ci_lower = ci_lower,
-        ci_upper = ci_upper,
-        prob_siblings_more_similar = t0_prob_more_similar
-      )
-  )
-
-  cohort_matching_annotation_df <- tibble(
-    cohort = cohort_label,
-    trait = c("Baseline expression (adjusted)", "Molt midpoint (t0, adjusted)"),
-    prob_siblings_more_similar = c(
-      baseline_prob_more_similar,
-      t0_prob_more_similar
-    ),
-    difference = c(
-      format_numeric_interval(baseline_difference_stats),
-      format_numeric_interval(t0_difference_stats)
-    ),
-    label = sprintf("Pr(observed < alternative) = %.2f", prob_siblings_more_similar)
-  )
-
-  cohort_matching_draw_df <- bind_rows(
-    tibble(
-      cohort = cohort_label,
-      trait = "Baseline expression (adjusted)",
-      comparison = "Observed sibling matching",
-      draw_id = seq_along(observed_baseline_matching),
-      estimate = observed_baseline_matching
-    ),
-    tibble(
-      cohort = cohort_label,
-      trait = "Baseline expression (adjusted)",
-      comparison = "Average alternative matching",
-      draw_id = seq_along(alternative_baseline_matching),
-      estimate = alternative_baseline_matching
-    ),
-    tibble(
-      cohort = cohort_label,
-      trait = "Molt midpoint (t0, adjusted)",
-      comparison = "Observed sibling matching",
-      draw_id = seq_along(observed_t0_matching),
-      estimate = observed_t0_matching
-    ),
-    tibble(
-      cohort = cohort_label,
-      trait = "Molt midpoint (t0, adjusted)",
-      comparison = "Average alternative matching",
-      draw_id = seq_along(alternative_t0_matching),
-      estimate = alternative_t0_matching
-    )
-  )
-
-  cohort_matching_plot_df <- bind_rows(
-    tibble(
-      cohort = cohort_label,
-      trait = "Baseline expression (adjusted)",
-      matching_id = cohort_matching_summary$matching_id,
-      estimate = apply(baseline_matching_draws, 2, median),
-      is_observed_sibling_matching = cohort_matching_summary$matching_id == observed_matching_id
-    ),
-    tibble(
-      cohort = cohort_label,
-      trait = "Molt midpoint (t0, adjusted)",
-      matching_id = cohort_matching_summary$matching_id,
-      estimate = apply(t0_matching_draws, 2, median),
-      is_observed_sibling_matching = cohort_matching_summary$matching_id == observed_matching_id
-    )
-  )
-
-  list(
-    pair_summary = cohort_pair_summary,
-    similarity_summary = cohort_similarity_summary,
-    matching_plot_df = cohort_matching_plot_df,
-    matching_interval_df = cohort_matching_interval_df,
-    matching_annotation_df = cohort_matching_annotation_df,
-    matching_draw_df = cohort_matching_draw_df
-  )
-}
-
-sibling_bird_ids_all <- sort(unique(c(sibling_pairs$bird_1, sibling_pairs$bird_2)))
-
-fy_sibling_ids <- sibling_pairs %>%
-  filter(cohort == "FY") %>%
-  select(bird_1, bird_2) %>%
-  unlist(use.names = FALSE) %>%
-  unique() %>%
-  sort()
-
-afy_sibling_ids <- sibling_pairs %>%
-  filter(cohort == "AFY") %>%
-  select(bird_1, bird_2) %>%
-  unlist(use.names = FALSE) %>%
-  unique() %>%
-  sort()
-
-sibling_model_paths <- c(
-  all = here("out/sex_sibling_all_mod_.rds"),
-  fy = here("out/sex_sibling_fy_mod_.rds"),
-  afy = here("out/sex_sibling_afy_mod_.rds")
-)
-
-if (all(file.exists(sibling_model_paths))) {
-  sibling_all_mod <- readRDS(sibling_model_paths[["all"]])
-  sibling_fy_mod <- readRDS(sibling_model_paths[["fy"]])
-  sibling_afy_mod <- readRDS(sibling_model_paths[["afy"]])
-
-  sibling_pheno_all <- build_sibling_bird_phenotypes(
-    sibling_all_mod,
-    sibling_bird_ids_all
-  )
-  sibling_pheno_fy <- build_sibling_bird_phenotypes(
-    sibling_fy_mod,
-    fy_sibling_ids
-  )
-  sibling_pheno_afy <- build_sibling_bird_phenotypes(
-    sibling_afy_mod,
-    afy_sibling_ids
-  )
-
-  sibling_similarity_all <- summarise_sibling_similarity(
-    sibling_bird_ids_all,
-    sibling_pairs,
-    sibling_pheno_all$baseline_bird,
-    sibling_pheno_all$t0_bird,
-    cohort_label = "All sibling birds"
-  )
-
-  sibling_similarity_fy <- summarise_sibling_similarity(
-    fy_sibling_ids,
-    sibling_pairs %>% filter(cohort == "FY"),
-    sibling_pheno_fy$baseline_bird,
-    sibling_pheno_fy$t0_bird,
-    cohort_label = "FY sibling birds"
-  )
-
-  sibling_similarity_afy <- summarise_sibling_similarity(
-    afy_sibling_ids,
-    sibling_pairs %>% filter(cohort == "AFY"),
-    sibling_pheno_afy$baseline_bird,
-    sibling_pheno_afy$t0_bird,
-    cohort_label = "AFY sibling birds"
-  )
-
-  sibling_pair_distance_summary <- bind_rows(
-    sibling_similarity_all$pair_summary,
-    sibling_similarity_fy$pair_summary,
-    sibling_similarity_afy$pair_summary
-  )
-
-  sibling_similarity_summary <- bind_rows(
-    sibling_similarity_all$similarity_summary,
-    sibling_similarity_fy$similarity_summary,
-    sibling_similarity_afy$similarity_summary
-  )
-
-  sibling_matching_plot_df <- bind_rows(
-    sibling_similarity_all$matching_plot_df,
-    sibling_similarity_fy$matching_plot_df,
-    sibling_similarity_afy$matching_plot_df
-  )
-
-  sibling_matching_interval_df <- bind_rows(
-    sibling_similarity_all$matching_interval_df,
-    sibling_similarity_fy$matching_interval_df,
-    sibling_similarity_afy$matching_interval_df
-  )
-
-  sibling_matching_annotation_df <- bind_rows(
-    sibling_similarity_all$matching_annotation_df,
-    sibling_similarity_fy$matching_annotation_df,
-    sibling_similarity_afy$matching_annotation_df
-  )
-
-  sibling_matching_draw_df <- bind_rows(
-    sibling_similarity_all$matching_draw_df,
-    sibling_similarity_fy$matching_draw_df,
-    sibling_similarity_afy$matching_draw_df
-  )
-}
+```{r first-year-breeding-records}
+fy_breeding_dates <- dat_breeding %>%
+  filter(age_class == "FY") %>%
+  semi_join(distinct(dat_breeding_mod, rings_comb, season),
+            by = c("rings_comb", "season")) %>%
+  select(rings_comb, season, first_date_breeding_final,
+         last_nest_first_obs, last_date_breeding_final) %>% distinct()
+stopifnot(nrow(fy_breeding_dates) == 2L)
+knitr::kable(fy_breeding_dates)
 ```
 
-#### Table: posterior distances for the observed sibling pairs
-```{r, echo=FALSE}
-if (exists("sibling_pair_distance_summary")) {
-  knitr::kable(
-    sibling_pair_distance_summary %>%
-      rename(
-        Cohort = cohort,
-        Pair = pair_label,
-        `|Δ adjusted baseline| (score units)` = baseline_distance,
-        `|Δ adjusted t0| (days)` = t0_distance
-      ) %>%
-      select(
-        Cohort,
-        Pair,
-        `|Δ adjusted baseline| (score units)`,
-        `|Δ adjusted t0| (days)`
-      ),
-    align = c("l", "l", "l", "l")
-  )
-}
-```
+### Sex composition across age classes
 
-#### Summary table: observed sibling matching versus alternative pairings
-```{r, echo=FALSE}
-if (exists("sibling_similarity_summary")) {
-  knitr::kable(
-    sibling_similarity_summary %>%
-      mutate(
-        `Pr(siblings more similar)` = sprintf("%.2f", prob_siblings_more_similar),
-        `Pr(siblings are closest matching)` = sprintf("%.2f", prob_siblings_closest_matching)
-      ) %>%
-      select(
-        cohort,
-        trait,
-        observed_sibling_matching,
-        average_alternative_matching,
-        sibling_minus_alternative,
-        `Pr(siblings more similar)`,
-        `Pr(siblings are closest matching)`,
-        n_matchings
-      ) %>%
-      rename(
-        Cohort = cohort,
-        Trait = trait,
-        `Observed sibling matching` = observed_sibling_matching,
-        `Average alternative matching` = average_alternative_matching,
-        `Sibling - alternative` = sibling_minus_alternative,
-        `No. possible matchings` = n_matchings
-      ),
-    align = c("l", "l", "l", "l", "l", "r", "r", "r")
-  )
-}
-```
-
-#### Plot: observed sibling matching against all alternative matchings
-```{r, echo=FALSE, fig.width=8, fig.height=5}
-if (exists("sibling_matching_plot_df")) {
-  sibling_matching_plot_df_all <- sibling_matching_plot_df %>%
-    filter(cohort == "All sibling birds")
-
-  sibling_matching_interval_df_all <- sibling_matching_interval_df %>%
-    filter(cohort == "All sibling birds") %>%
-    mutate(
-      x_position = case_when(
-        comparison == "Average alternative matching" ~ 1,
-        comparison == "Observed sibling matching" ~ 2,
-        TRUE ~ 1
-      )
-    )
-
-  sibling_matching_draw_df_all <- sibling_matching_draw_df %>%
-    filter(cohort == "All sibling birds") %>%
-    mutate(
-      x_position = case_when(
-        comparison == "Average alternative matching" ~ 1,
-        comparison == "Observed sibling matching" ~ 2,
-        TRUE ~ 1
-      )
-    )
-
-  sibling_matching_annotation_df_all <- sibling_matching_annotation_df %>%
-    filter(cohort == "All sibling birds")
-
-  sibling_matching_y_ranges <- bind_rows(
-    sibling_matching_plot_df_all %>%
-      transmute(trait, y_value = estimate),
-    sibling_matching_draw_df_all %>%
-      transmute(trait, y_value = estimate),
-    sibling_matching_interval_df_all %>%
-      transmute(trait, y_value = ci_lower),
-    sibling_matching_interval_df_all %>%
-      transmute(trait, y_value = ci_upper)
-  ) %>%
-    group_by(trait) %>%
-    summarise(
-      y_min = min(y_value, na.rm = TRUE),
-      y_max = max(y_value, na.rm = TRUE),
-      .groups = "drop"
-    ) %>%
-    mutate(
-      y_range = y_max - y_min,
-      y_label = y_max - 0.08 * y_range
-    )
-
-  sibling_matching_annotation_df_all <- sibling_matching_annotation_df_all %>%
-    left_join(sibling_matching_y_ranges, by = "trait") %>%
-    mutate(
-      x_position = 1.5,
-      label = label
-    )
-
-  sibling_matching_y_labels <- c(
-    "Baseline expression (adjusted)" =
-      "Mean pairwise distance in baseline expression (sex-adjusted)",
-    "Molt midpoint (t0, adjusted)" =
-      "Mean pairwise distance in molt midpoint timing (sex-adjusted)"
-  )
-
-  make_sibling_matching_panel <- function(trait_i, y_label_i) {
-    # The violins are posterior draws for the observed sibling matching and
-    # the average alternative matching. The grey points are medians for each
-    # individual alternative matching, so they are not expected to have the
-    # same spread as the average-alternative posterior.
-    ggplot() +
-      geom_violin(
-        data = sibling_matching_draw_df_all %>%
-          filter(trait == trait_i),
-        aes(
-          x = x_position,
-          y = estimate,
-          group = comparison,
-          fill = comparison
-        ),
-        width = 0.55,
-        trim = FALSE,
-        alpha = 0.35,
-        colour = NA
-      ) +
-      geom_jitter(
-        data = sibling_matching_plot_df_all %>%
-          filter(trait == trait_i, !is_observed_sibling_matching),
-        aes(x = 1, y = estimate, colour = "Individual alternative matchings"),
-        width = 0.11,
-        shape = 16,
-        size = 1.6,
-        alpha = 0.32
-      ) +
-      geom_errorbar(
-        data = sibling_matching_interval_df_all %>%
-          filter(trait == trait_i),
-        aes(
-          x = x_position,
-          ymin = ci_lower,
-          ymax = ci_upper,
-          colour = comparison
-        ),
-        width = 0.04,
-        linewidth = 0.65,
-        alpha = 0.95
-      ) +
-      geom_point(
-        data = sibling_matching_interval_df_all %>%
-          filter(trait == trait_i, comparison == "Average alternative matching"),
-        aes(x = x_position, y = estimate, colour = comparison),
-        shape = 18,
-        size = 3.5,
-        alpha = 1
-      ) +
-      geom_point(
-        data = sibling_matching_interval_df_all %>%
-          filter(trait == trait_i, comparison == "Observed sibling matching"),
-        aes(x = x_position, y = estimate),
-        shape = 21,
-        size = 4,
-        fill = "#B24745",
-        colour = "black",
-        stroke = 0.45,
-        show.legend = FALSE
-      ) +
-      geom_point(
-        data = sibling_matching_interval_df_all %>%
-          filter(trait == trait_i, comparison == "Observed sibling matching"),
-        aes(x = x_position, y = estimate, colour = comparison),
-        shape = 16,
-        size = 2.5,
-        alpha = 1
-      ) +
-      geom_text(
-        data = sibling_matching_annotation_df_all %>%
-          filter(trait == trait_i),
-        aes(x = x_position, y = y_label, label = label),
-        inherit.aes = FALSE,
-        size = 3,
-        lineheight = 0.95,
-        colour = "grey25"
-      ) +
-      scale_x_continuous(
-        breaks = c(1, 2),
-        labels = c("Alternative\nmatchings", "Observed\nsiblings"),
-        limits = c(0.55, 2.45)
-      ) +
-      scale_colour_manual(
-        values = c(
-          "Individual alternative matchings" = "grey72",
-          "Average alternative matching" = "grey25",
-          "Observed sibling matching" = "#B24745"
-        ),
-        name = ""
-      ) +
-      scale_fill_manual(
-        values = c(
-          "Average alternative matching" = "grey55",
-          "Observed sibling matching" = "#B24745"
-        ),
-        guide = "none"
-      ) +
-      labs(
-        x = "",
-        y = y_label_i
-      ) +
-      luke_theme +
-      theme(
-        axis.text.x = element_text(size = 9),
-        legend.position = "top"
-      )
-  }
-
-  sibling_matching_plot <-
-    make_sibling_matching_panel(
-      "Baseline expression (adjusted)",
-      sibling_matching_y_labels[["Baseline expression (adjusted)"]]
-    ) +
-    make_sibling_matching_panel(
-      "Molt midpoint (t0, adjusted)",
-      sibling_matching_y_labels[["Molt midpoint (t0, adjusted)"]]
-    ) +
-    plot_layout(guides = "collect") &
-    theme(
-      legend.position = "top",
-      legend.title = element_blank()
-    )
-
-  # Explicitly print the patchwork object so knitr embeds it in the HTML output.
-  print(sibling_matching_plot)
-
-  ggsave(
-    plot = sibling_matching_plot,
-    filename = "FigS2.pdf",
-    path = here("figs/"),
-    device = cairo_pdf,
-    width = 8,
-    height = 8
-  )
-}
-```
-
-### Is sex composition independent of age class?
-Yes
+We compared sex composition using a two-sided Fisher’s exact test. Each bird contributes once. We compare birds photographed at least once as FY with birds photographed only as AFY, matching the sample counts reported in the Methods. Birds observed in both classes contribute once to the FY category. The test does not assess whether group sizes are equal or sufficient for interaction models.
 ```{r}
 sex_age_class_mod <- readRDS(here("out/sex_age_class_mod_2.rds"))
 sex_age <-
   sex_age_class_mod$data %>%
   distinct(rings_comb, sex, age_class) %>%
   group_by(rings_comb) %>%
-  arrange(desc(age_class)) %>%
+  arrange(age_class) %>%
   slice(1)
+# Factor levels are FY, AFY: a bird recorded in both classes remains in FY.
 
 tab_sex_age <- table(
   sex_age$sex,
   sex_age$age_class
 )
 
-fisher.test(tab_sex_age)
+age_composition_test <- fisher.test(tab_sex_age)
+tab_sex_age
+age_composition_test
 ```
 
-### Is sex composition independent of migratory status?
-Yes
+The comparison contains nine birds photographed as FY and 74 photographed only as AFY. The two-sided test gives P = `r sprintf("%.3f", age_composition_test$p.value)`. A lack of a clear association does not establish equal sex proportions.
+
+### Sex composition across migratory groups
+
+We used the same two-sided Fisher’s exact test for the migration comparison. The odds ratio returned by `fisher.test()` describes the magnitude of the same association, rather than a separate test.
 ```{r}
 sex_migratory_status_mod <- readRDS(here("out/sex_migratory_status_mod_.rds"))
 
@@ -4485,10 +3616,12 @@ tab_sex_mig <- table(
   sex_mig$migratory_status
 )
 
-fisher.test(tab_sex_mig)
+migration_composition_test <- fisher.test(tab_sex_mig)
+tab_sex_mig
+migration_composition_test
 ```
 
-## Reproducibility details
+## Reproducibility details {#reproducibility-details}
 
 This Quarto document can be reproduced in two ways. Rendering from the saved
 objects in `out/` reproduces the manuscript tables and figures without
@@ -4511,8 +3644,8 @@ reproducibility_software <- tibble(
     R.version.string,
     R.version$platform,
     paste(Sys.info()[["sysname"]], Sys.info()[["release"]]),
-    "August 7, 2026",
-    here::here()
+    as.character(Sys.Date()),
+    "Repository root"
   )
 )
 
@@ -4560,13 +3693,13 @@ knitr::kable(
 )
 ```
 
+### Figure export names
+
+The displayed figure numbers follow the manuscript. Two export filenames retain earlier numbers: `figs/Figure5_afy_components_revision3.pdf` and its PNG contain the current **Figure 4**, and `figs/FigS3.pdf` contains the current **Figure S2**. Figure S1's six PNG panels are in `figs/Figure_S1_for_Word_2026-11-20/`. Rendering uses those existing panels. Running the displayed Figure S1 export command regenerates the PNGs and a combined PDF.
+
 ### Required repository files
 
-These are the tracked files currently retained for the curated manuscript
-companion repository. They include the datasets and saved model objects used by
-the Quarto workflow, plus the figure assets kept for the rendered companion and
-README. Earlier AFY continuous-age model objects are intentionally omitted
-because that analysis is no longer part of the revised manuscript. The final
+The following files supply the data, eight reported fits and figure assets used by this companion. The manifest checks their presence locally. File presence does not establish that each file has been included in an external repository or archive. The final
 export file `out/grand_summary_table_final_.xlsx` is optional and is only
 written if the export chunk is run manually.
 
@@ -4577,24 +3710,29 @@ reproducibility_inputs <-
     "data/moult_breeding_KK_data.rds", "Main photo-level molt and breeding dataset",
     "data/breeding_KK_data.rds", "Bird-season breeding phenology dataset",
     "data/nests_KK_data.rds", "Nest dataset used for the breeding-period overlay",
+    "data/Scoring - test.xlsx", "Original inter-observer scoring worksheet",
+    "R/scoring_validation_correlations.R", "Original read-only scoring-validation calculation",
+    "assets/fonts/Lato-Regular.ttf", "Lato Regular used for Figure 4",
+    "assets/fonts/OFL.txt", "SIL Open Font License for the bundled Lato font",
     "figs/fig1a.png", "Static manuscript panel used for Figure 1a",
-    "figs/fig_1.png", "Overview image displayed in the repository README",
     "out/sex_mod_.rds", "Main sex-specific molt model",
     "out/sex_age_class_mod_2.rds", "Main age-class molt model",
     "out/sex_migratory_status_mod_.rds", "Main migratory-strategy molt model",
-    "out/sex_first_breed_only_mod_.rds", "Single-predictor model for first breeding date",
-    "out/sex_last_nest_first_obs_only_mod_.rds", "Single-predictor model for last nest initiation date",
-    "out/sex_last_breed_only_mod_.rds", "Single-predictor model for last breeding date",
-    "out/mod_age_class_first_brms_.rds", "Supporting age-class model for first breeding date",
-    "out/mod_age_class_lay_brms_.rds", "Supporting age-class model for last nest initiation date",
-    "out/mod_age_class_last_brms_.rds", "Supporting age-class model for last breeding date",
-    "out/sex_sibling_all_mod_.rds", "Supplementary sibling model using all trusted sibling birds",
-    "out/sex_sibling_fy_mod_.rds", "Supplementary sibling model restricted to FY birds",
-    "out/sex_sibling_afy_mod_.rds", "Supplementary sibling model restricted to AFY birds"
+    "out/sex_first_breed_within_individual_afy_mod_.rds", "AFY among/within model for first observed breeding date",
+    "out/sex_last_nest_within_individual_afy_mod_.rds", "AFY among/within model for last nest date",
+    "out/sex_last_breed_within_individual_afy_mod_.rds", "AFY among/within model for last observed breeding date",
+    "out/afy_sex_last_breeding_interaction_2026-11-18/model.rds", "Supplementary AFY sex by among/within last breeding date model",
+    "scripts/run_afy_sex_last_breeding_interaction_2026-11-18.R", "Refitting and centering audits for the AFY sex by breeding date model",
+    "out/sex_migratory_interaction_mod_.rds", "Supplementary sex by migratory status model",
+    "scripts/run_afy_within_individual_breeding_phenology_models.R", "AFY data preparation, individual centering and model fitting",
+    "scripts/export_figure_s1_panels_2026-11-20.R", "Fixed-width Figure S1 exports"
   ) %>%
+  bind_rows(tibble(path = s1_files, role = "Completed Figure S1 PNG panel"),
+            tibble(path = visit_files, role = "Original nest-visit workbook")) %>%
   mutate(
     exists_in_repo = if_else(file.exists(here(path)), "yes", "no")
   )
+stopifnot(all(reproducibility_inputs$exists_in_repo == "yes"))
 
 knitr::kable(
   reproducibility_inputs,
@@ -4605,12 +3743,9 @@ knitr::kable(
 
 ### Optional refitting settings
 
-All `brms` models in this document are fitted with four chains. The main molt
-models use 10,000 iterations per chain with 5,000 warmup iterations and
-`backend = "cmdstanr"`. The supporting Gaussian age-class breeding-phenology
-models use 4,000 iterations per chain with 1,000 warmup iterations, whereas
-the supplementary sibling models currently use 10,000 iterations per chain with
-5,000 warmup iterations. The seeds used in the current source are listed below
+All models in this document use `brms` with `cmdstanr` as the backend,
+running four parallel chains of 10,000 iterations each, including 5,000
+warmup iterations. The seeds used in the current source are listed below
 so a reader can refit with the same random-number initialization.
 
 ```{r reproducibility-refit-settings, echo=FALSE}
@@ -4618,15 +3753,13 @@ refit_settings <-
   tribble(
     ~analysis, ~output_file, ~seed, ~iter, ~warmup, ~notes,
     "Sex-specific molt model", "out/sex_mod_.rds", 123, 10000, 5000, "Main manuscript model",
-    "First breeding date molt model", "out/sex_first_breed_only_mod_.rds", 141, 10000, 5000, "Single-predictor breeding-phenology model",
-    "Last breeding date molt model", "out/sex_last_breed_only_mod_.rds", 142, 10000, 5000, "Single-predictor breeding-phenology model",
-    "Last nest initiation molt model", "out/sex_last_nest_first_obs_only_mod_.rds", 143, 10000, 5000, "Single-predictor breeding-phenology model",
     "Age-class molt model", "out/sex_age_class_mod_2.rds", 123, 10000, 5000, "Main manuscript model",
     "Migratory-strategy molt model", "out/sex_migratory_status_mod_.rds", 123, 10000, 5000, "Main manuscript model",
-    "Age-class breeding phenology models", "out/mod_age_class_{first,lay,last}_brms_.rds", 123, 4000, 1000, "Supporting manuscript check",
-    "Sibling model: all trusted sibling birds", "out/sex_sibling_all_mod_.rds", 601, 10000, 5000, "Supplementary Figure S2",
-    "Sibling model: FY birds", "out/sex_sibling_fy_mod_.rds", 602, 10000, 5000, "Supplementary Figure S2",
-    "Sibling model: AFY birds", "out/sex_sibling_afy_mod_.rds", 603, 10000, 5000, "Supplementary Figure S2"
+    "AFY first observed breeding date", "out/sex_first_breed_within_individual_afy_mod_.rds", 261, 10000, 5000, "Main among/within model",
+    "AFY last nest date", "out/sex_last_nest_within_individual_afy_mod_.rds", 262, 10000, 5000, "Main among/within model",
+    "AFY last observed breeding date", "out/sex_last_breed_within_individual_afy_mod_.rds", 263, 10000, 5000, "Main among/within model",
+    "AFY sex by among/within last breeding date", "out/afy_sex_last_breeding_interaction_2026-11-18/model.rds", 264, 10000, 5000, "Supplementary midpoint interactions with individual mean and seasonal deviation",
+    "Sex by migratory status model", "out/sex_migratory_interaction_mod_.rds", 242, 10000, 5000, "Supplementary midpoint interaction"
   )
 
 knitr::kable(
@@ -4636,11 +3769,90 @@ knitr::kable(
 )
 ```
 
+### Sampling settings in the saved fits
+
+The table below reads the sampling settings from each saved fitted model.
+Rendering also checks that every model uses the stated backend, number of
+chains, iterations and warmup.
+
+```{r reproducibility-actual-sampler-audit, echo=FALSE}
+actual_sampler_audit <- reproducibility_inputs %>%
+  filter(grepl("^out/.*[.]rds$", path)) %>%
+  transmute(path, model = role) %>%
+  purrr::pmap_dfr(function(path, model) {
+    model_object <- readRDS(here(path))
+    fit <- model_object$fitted_model
+    sampler <- fit$fit@sim
+    tibble(
+      Model = model,
+      Backend = fit$backend,
+      Chains = sampler$chains,
+      Iterations = sampler$iter,
+      Warmup = sampler$warmup,
+      Observations = nrow(fit$data)
+    )
+  })
+stopifnot(
+  nrow(actual_sampler_audit) == 8L,
+  all(actual_sampler_audit$Backend == "cmdstanr"),
+  all(actual_sampler_audit$Chains == 4L),
+  all(actual_sampler_audit$Iterations == 10000L),
+  all(actual_sampler_audit$Warmup == 5000L)
+)
+knitr::kable(actual_sampler_audit)
+```
+
+### Posterior predictive and chain checks
+
+The manuscript describes checks of chain mixing and agreement between observed and simulated scores. The code below shows how to inspect each of the eight reported fits. It is optional during rendering because it generates new predictive simulations. Setting a seed makes the simulated checks repeatable. These checks assess the supplied Gaussian likelihood, including predictions outside the seven-level score range, without changing the fitted model.
+
+```{r optional-posterior-predictive-and-chain-checks, eval=FALSE}
+reported_models <- c(results_models, afy_models, interaction_models)
+set.seed(20261121)
+for (label in names(reported_models)) {
+  fit <- reported_models[[label]]$fitted_model
+  print(brms::mcmc_plot(fit, type = "trace",
+                       variable = c("b_baseline_Intercept", "b_t0_Intercept",
+                                    "b_k_Intercept", "sigma")))
+  print(brms::pp_check(fit, type = "dens_overlay", ndraws = 50))
+  yrep <- brms::posterior_predict(fit, ndraws = 400)
+  y <- fit$data$score
+  observed <- c(mean = mean(y), SD = sd(y),
+                below_1 = mean(y < 1), above_7 = mean(y > 7))
+  simulated <- cbind(mean = rowMeans(yrep), SD = apply(yrep, 1, sd),
+                    below_1 = rowMeans(yrep < 1), above_7 = rowMeans(yrep > 7))
+  print(label)
+  print(observed)
+  print(apply(simulated, 2, quantile, probs = c(0.025, 0.5, 0.975)))
+}
+```
+
+### Applying the model to another system
+
+Use one row per scored observation, with a unique individual identifier, season, date and the required predictors. Keep a separate bird-season record for breeding dates. A breeding date repeated over many photographs must contribute only once to the individual's mean. Check that the same identifier never refers to different individuals, and document how age class and migratory status were assigned.
+
+1. **Choose the trajectory for the biological process.** Equation (2) describes a decline from an estimated baseline to a common minimum of 1. A trait that increases, has another lower asymptote or follows a different seasonal pattern requires an appropriate change to the observation model. Check posterior predictions for the observed score range and distribution.
+2. **Define dates and their reference scale.** Record the date origin, season-centering rule and SD used for photographic dates. Save the inverse transformation with each fit. Center breeding dates within season if the question concerns dates relative to that season's schedule. Calculate individual means and deviations once per retained individual-season after applying the intended sample restriction.
+3. **Retain the hierarchy supported by repeated sampling.** Individual intercepts describe persistent differences, and individual-season intercepts describe annual deviations. Repeated seasons identify the within-individual breeding association. The current models estimate a shared slope and do not estimate individual variation in plasticity.
+4. **Inspect priors and the sampling design.** Priors expressed on standardized time or a seven-point score are not automatically suitable for another trait. The shared $k$ reflects the photographic coverage in this study. Its use does not provide a test of covariate effects on molt rate.
+5. **Fit and save to new paths.** Use the displayed formulas and fitting calls with your own data. Save the fit, analysis data, date reference, reporting conversion and session information together. Use new output filenames to preserve the supplied reference fits.
+6. **Check fit and interpret the comparison.** Inspect chains, effective sample sizes, divergences, tree-depth limits and posterior predictive checks. Report posterior intervals for both slopes and their paired-draw contrast. An association among individuals does not establish plasticity, and a within-individual association in observational data does not by itself establish a causal effect.
+
+Each supplied model is an R list containing `fitted_model` (a `brmsfit`) and `data`. AFY models also store `predictor`, `date_scaling_reference` and `midpoint_days_conversion`. The package table describes the current render environment. Where supplied, each model's `session_info` records its fitting environment, which can differ from the current render environment.
+
 ### Full session information
 
 ```{r reproducibility-session-info, echo=FALSE}
 sessionInfo()
 ```
+
+## Method references
+
+Bürkner, P.-C. 2017. brms: An R package for Bayesian multilevel models using Stan. *Journal of Statistical Software* 80(1):1–28. [doi:10.18637/jss.v080.i01](https://doi.org/10.18637/jss.v080.i01).
+
+Nakagawa, S., and H. Schielzeth. 2010. Repeatability for Gaussian and non-Gaussian data: A practical guide for biologists. *Biological Reviews* 85:935–956. [doi:10.1111/j.1469-185X.2010.00141.x](https://doi.org/10.1111/j.1469-185X.2010.00141.x).
+
+van de Pol, M., and J. Wright. 2009. A simple method for distinguishing within- versus between-subject effects using mixed models. *Animal Behaviour* 77:753–758. [doi:10.1016/j.anbehav.2008.11.006](https://doi.org/10.1016/j.anbehav.2008.11.006).
 
 ## AI use disclosure
 
