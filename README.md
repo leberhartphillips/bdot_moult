@@ -17,15 +17,30 @@ For correspondence, contact Luke Eberhart-Hertel: `luke.eberhart@bi.mpg.de`.
 
 ## Start here
 
+- **[Read the rendered analysis online](https://leberhartphillips.github.io/bdot_moult/)**:
+  open the complete analysis, figures, equations and R code in your browser.
 - [Commented analysis script](banded_dotterel_moult.qmd): Quarto source with the
   equations, their R implementations, sample definitions, results and diagnostics.
-- [Rendered analysis](banded_dotterel_moult.html): download this self-contained HTML
+- [Download the rendered HTML](banded_dotterel_moult.html): download this self-contained HTML
   file and open it in a browser. GitHub's file viewer does not display the full
   rendered document.
 
 The HTML includes code folding and a Code menu for viewing the source. Rendering
 uses the eight saved models in `out/`; **it does not refit any model**. The
 model-fitting calls are shown in blocks marked `eval=FALSE` for optional refitting.
+
+### Updating the online analysis
+
+GitHub Pages publishes the committed HTML whenever it or the publishing workflow
+changes on `main`. After editing the QMD, render it locally and commit both the QMD
+and HTML. The publishing workflow copies the HTML to the website; it does not run
+R or refit models.
+
+For initial setup, choose **GitHub Actions** under **Settings → Pages → Build and
+deployment → Source**. Once this change is merged into `main`, the workflow
+publishes the site. If Pages is enabled after merging, run **Publish rendered
+analysis → Run workflow** from the repository's Actions tab. This follows
+[GitHub's Pages workflow setup](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
 
 ## Manuscript outputs
 

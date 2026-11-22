@@ -5,6 +5,7 @@
 # Explicit publication bundle
 !/.gitignore
 !/README.md
+!/.github/workflows/publish-analysis.yml
 !/LICENSE
 !/banded_dotterel_moult.qmd
 !/banded_dotterel_moult.html
